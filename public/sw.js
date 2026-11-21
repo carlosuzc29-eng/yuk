@@ -1,5 +1,4 @@
-const CACHE_NAME = 'yuk-shell-v3';
-// Rutas relativas al scope del SW (funciona igual en raíz o bajo basePath de GitHub Pages).
+const CACHE_NAME = 'yuk-shell-v4';
 const APP_SHELL = [
   './',
   './hoy/',
@@ -43,13 +42,23 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Navegaciones HTML: network-first para mostrar siempre la versión más reciente
-  // y usar caché automáticamente cuando no hay conexión.
+  // NUNCA interceptar payloads RSC de Next.js (*.txt / ?_rsc / header RSC)
+  // para evitar que un cambio de build redirija al navegador a .../index.txt
+  if (
+    url.pathname.endsWith('.txt') ||
+    url.searchParams.has('_rsc') ||
+    request.headers.get('RSC') === '1'
+  ) {
+    return;
+  }
+
+  // Navegaciones HTML: network-first con respaldo offline
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response && response.status === 200 && response.type === 'basic') {
+          const contentType = response.headers.get('content-type') || '';
+          if (response.status === 200 && contentType.includes('text/html')) {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
@@ -67,19 +76,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Assets estáticos: stale-while-revalidate
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const networkFetch = fetch(request)
-        .then((response) => {
+  // Assets inmutables con hash de Next.js (/_next/static/)
+  if (url.pathname.includes('/_next/static/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
           if (response && response.status === 200 && response.type === 'basic') {
             const copy = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
           }
           return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
-  );
+        });
+      })
+    );
+  }
 });
