@@ -1,84 +1,100 @@
 @import "tailwindcss";
 
 /* ============================================================
-   FORJA Design System — Modern color-scheme + light-dark()
-   Estética: Grafito oscuro + Rojo disco olímpico + Modo claro AA
+   YUK Design System — basado en "amp"
+   Un solo acento naranja sobre lienzo acromático, una sola
+   tipografía (Inter como sustituto de PublicaSans, pesos 300/400/500),
+   bordes hairline, sin sombras salvo el CTA principal.
    ============================================================ */
 :root {
-  /* Raw palette tokens */
-  --forja-bg-light: #f4f5f7;
-  --forja-bg-dark: #0e1014;
+  /* Paleta base */
+  --amp-orange: #ff6105;
+  --amp-orange-hover: #ec5600;
+  --amp-glow: #ffa069;
+  --peach-wash: #ffdfcd;
+  --ink: #0a0a0a;
+  --carbon: #292b2a;
+  --slate: #7a7b7b;
+  --ash: #a2a3a2;
+  --hairline: #e5e5e5;
+  --fog: #dfe0df;
+  --bone: #e5e7eb;
+  --canvas: #ffffff;
+  --linen: #f3f4f3;
+  --charcoal: #202120;
+  --smoke: #3c3e3d;
 
-  --forja-surface-light: #ffffff;
-  --forja-surface-dark: #161a21;
+  /* Tokens semánticos — modo claro (por defecto) */
+  --yuk-bg-light: var(--canvas);
+  --yuk-bg-dark: #111211;
+  --yuk-surface-light: var(--canvas);
+  --yuk-surface-dark: #181918;
+  --yuk-surface-elevated-light: var(--linen);
+  --yuk-surface-elevated-dark: var(--charcoal);
+  --yuk-border-light: var(--hairline);
+  --yuk-border-dark: #2c2e2d;
+  --yuk-text-light: var(--ink);
+  --yuk-text-dark: #f3f4f3;
+  --yuk-text-secondary-light: var(--carbon);
+  --yuk-text-secondary-dark: #d4d5d4;
+  --yuk-text-muted-light: var(--slate);
+  --yuk-text-muted-dark: var(--ash);
+  --yuk-accent-soft-light: var(--peach-wash);
+  --yuk-accent-soft-dark: rgba(255, 97, 5, 0.14);
+  --yuk-danger-light: #c4320a;
+  --yuk-danger-dark: #ff8a65;
+  --yuk-success-light: #1f7a45;
+  --yuk-success-dark: #5fd38d;
 
-  --forja-surface-elevated-light: #ebedf2;
-  --forja-surface-elevated-dark: #1f242e;
-
-  --forja-border-light: #d5d9e2;
-  --forja-border-dark: #2a313e;
-
-  --forja-text-light: #11141a;
-  --forja-text-dark: #f4f5f7;
-
-  --forja-text-muted-light: #4b5563;
-  --forja-text-muted-dark: #9ca3af;
-
-  --forja-accent-light: #c81425;
-  --forja-accent-dark: #e11d2e;
-
-  --forja-accent-hover-light: #a60f1e;
-  --forja-accent-hover-dark: #ff3346;
-
-  --forja-success-light: #15803d;
-  --forja-success-dark: #22c55e;
-
-  --forja-warning-light: #b45309;
-  --forja-warning-dark: #f59e0b;
-
-  /* Fallback tokens for browsers without light-dark() */
-  --bg: var(--forja-bg-light);
-  --surface: var(--forja-surface-light);
-  --surface-elevated: var(--forja-surface-elevated-light);
-  --border: var(--forja-border-light);
-  --text: var(--forja-text-light);
-  --text-muted: var(--forja-text-muted-light);
-  --accent: var(--forja-accent-light);
-  --accent-hover: var(--forja-accent-hover-light);
-  --success: var(--forja-success-light);
-  --warning: var(--forja-warning-light);
+  --bg: var(--yuk-bg-light);
+  --surface: var(--yuk-surface-light);
+  --surface-elevated: var(--yuk-surface-elevated-light);
+  --border: var(--yuk-border-light);
+  --text: var(--yuk-text-light);
+  --text-secondary: var(--yuk-text-secondary-light);
+  --text-muted: var(--yuk-text-muted-light);
+  --accent: var(--amp-orange);
+  --accent-hover: var(--amp-orange-hover);
+  --accent-soft: var(--yuk-accent-soft-light);
+  --danger: var(--yuk-danger-light);
+  --success: var(--yuk-success-light);
+  --warning: var(--amp-orange);
 
   @media (prefers-color-scheme: dark) {
-    --bg: var(--forja-bg-dark);
-    --surface: var(--forja-surface-dark);
-    --surface-elevated: var(--forja-surface-elevated-dark);
-    --border: var(--forja-border-dark);
-    --text: var(--forja-text-dark);
-    --text-muted: var(--forja-text-muted-dark);
-    --accent: var(--forja-accent-dark);
-    --accent-hover: var(--forja-accent-hover-dark);
-    --success: var(--forja-success-dark);
-    --warning: var(--forja-warning-dark);
+    --bg: var(--yuk-bg-dark);
+    --surface: var(--yuk-surface-dark);
+    --surface-elevated: var(--yuk-surface-elevated-dark);
+    --border: var(--yuk-border-dark);
+    --text: var(--yuk-text-dark);
+    --text-secondary: var(--yuk-text-secondary-dark);
+    --text-muted: var(--yuk-text-muted-dark);
+    --accent-soft: var(--yuk-accent-soft-dark);
+    --danger: var(--yuk-danger-dark);
+    --success: var(--yuk-success-dark);
   }
 
-  /* Modern automatic light-dark() tokens */
   @supports (color: light-dark(white, black)) {
-    --bg: light-dark(var(--forja-bg-light), var(--forja-bg-dark));
-    --surface: light-dark(var(--forja-surface-light), var(--forja-surface-dark));
+    --bg: light-dark(var(--yuk-bg-light), var(--yuk-bg-dark));
+    --surface: light-dark(var(--yuk-surface-light), var(--yuk-surface-dark));
     --surface-elevated: light-dark(
-      var(--forja-surface-elevated-light),
-      var(--forja-surface-elevated-dark)
+      var(--yuk-surface-elevated-light),
+      var(--yuk-surface-elevated-dark)
     );
-    --border: light-dark(var(--forja-border-light), var(--forja-border-dark));
-    --text: light-dark(var(--forja-text-light), var(--forja-text-dark));
-    --text-muted: light-dark(var(--forja-text-muted-light), var(--forja-text-muted-dark));
-    --accent: light-dark(var(--forja-accent-light), var(--forja-accent-dark));
-    --accent-hover: light-dark(var(--forja-accent-hover-light), var(--forja-accent-hover-dark));
-    --success: light-dark(var(--forja-success-light), var(--forja-success-dark));
-    --warning: light-dark(var(--forja-warning-light), var(--forja-warning-dark));
+    --border: light-dark(var(--yuk-border-light), var(--yuk-border-dark));
+    --text: light-dark(var(--yuk-text-light), var(--yuk-text-dark));
+    --text-secondary: light-dark(
+      var(--yuk-text-secondary-light),
+      var(--yuk-text-secondary-dark)
+    );
+    --text-muted: light-dark(var(--yuk-text-muted-light), var(--yuk-text-muted-dark));
+    --accent-soft: light-dark(var(--yuk-accent-soft-light), var(--yuk-accent-soft-dark));
+    --danger: light-dark(var(--yuk-danger-light), var(--yuk-danger-dark));
+    --success: light-dark(var(--yuk-success-light), var(--yuk-success-dark));
   }
 
-  /* MANDATORY: Keep base declaration as light dark and map <meta> overrides */
+  /* Firma de marca: brillo naranja solo en el CTA principal */
+  --shadow-cta: rgba(255, 97, 5, 0.45) 1px 6px 14px 0px, rgba(0, 0, 0, 0.06) 0px 1px 4px 0px;
+
   color-scheme: light dark;
   accent-color: var(--accent);
 
@@ -92,8 +108,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
-  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 html,
@@ -101,17 +117,120 @@ body {
   background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   min-height: 100dvh;
 }
 
-/* Tipografía de títulos condensada estilo gimnasio premium */
+/* ---------- Tipografía editorial ---------- */
+/* Titulares: peso Light 300, el tracking se cierra a medida que crece */
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: 0.02em;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
-/* Foco accesible visible (WCAG AA) */
+/* Etiqueta tipo "FEATURED ON": 12px, mayúsculas, espaciada, gris */
+.eyebrow {
+  font-size: 12px;
+  line-height: 1.5;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Regla de acento bajo titulares: el signo de puntuación de la marca */
+.accent-rule {
+  display: block;
+  height: 2px;
+  width: 48px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ---------- Formularios ---------- */
+.field {
+  width: 100%;
+  min-height: 48px;
+  border-radius: 50px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 18px;
+  font-size: 16px;
+  color: var(--text);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field::placeholder {
+  color: var(--ash);
+}
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 97, 5, 0.18);
+}
+
+.field-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+/* ---------- Selectores (tarjetas de opción, toggles) ---------- */
+.choice {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.choice:hover {
+  border-color: var(--ash);
+}
+.choice[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* Segmentos monocromos: el naranja se reserva para la acción principal */
+.segment {
+  border-radius: 24px;
+  color: var(--text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.segment[data-active="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+/* ---------- Mensajes ---------- */
+.alert {
+  font-size: 13px;
+  line-height: 1.5;
+  border-radius: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface-elevated);
+}
+.alert-error {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.alert-success {
+  color: var(--success);
+  border-color: color-mix(in srgb, var(--success) 35%, transparent);
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+}
+
+/* Foco accesible visible */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;

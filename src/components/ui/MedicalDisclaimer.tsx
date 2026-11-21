@@ -13,15 +13,19 @@ export function MedicalDisclaimer({ compact = false, className }: MedicalDisclai
       role="note"
       aria-label="Aviso de salud y seguridad"
       className={cn(
-        'flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)]',
-        compact ? 'p-3 text-xs' : 'p-4 text-xs sm:text-sm',
+        'flex items-start gap-3 rounded-[5px] border border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)]',
+        compact ? 'p-3.5 text-xs' : 'p-4 text-xs sm:text-sm',
         className
       )}
     >
-      <ShieldAlert className="h-4 w-4 shrink-0 text-[var(--warning)] mt-0.5" aria-hidden="true" />
+      <ShieldAlert
+        className="h-4 w-4 shrink-0 text-[var(--text-secondary)] mt-0.5"
+        strokeWidth={1.6}
+        aria-hidden="true"
+      />
       <p className="leading-relaxed">
-        <strong className="text-[var(--text)]">Aviso importante:</strong> YUK no sustituye a un
-        médico, fisioterapeuta ni a un entrenador presencial. Si tienes lesiones, dolor agudo o
+        <span className="font-medium text-[var(--text)]">Aviso importante.</span> YUK no sustituye a
+        un médico, fisioterapeuta ni a un entrenador presencial. Si tienes lesiones, dolor agudo o
         condiciones médicas previas, consulta con un profesional de la salud antes de entrenar.
       </p>
     </aside>

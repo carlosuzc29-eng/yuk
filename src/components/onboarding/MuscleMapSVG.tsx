@@ -240,19 +240,15 @@ export function MuscleMapSVG({
         <div
           role="tablist"
           aria-label="Vista del cuerpo"
-          className="inline-flex rounded-xl bg-[var(--surface-elevated)] p-1 border border-[var(--border)]"
+          className="inline-flex rounded-[24px] bg-[var(--surface-elevated)] p-1"
         >
           <button
             type="button"
             role="tab"
             aria-selected={view === 'front'}
             onClick={() => setView('front')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider min-h-[38px] transition-colors cursor-pointer',
-              view === 'front'
-                ? 'bg-[var(--accent)] text-white'
-                : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-            )}
+            data-active={view === 'front'}
+            className="segment px-4 py-2 text-xs min-h-[38px]"
           >
             Frontal
           </button>
@@ -261,19 +257,15 @@ export function MuscleMapSVG({
             role="tab"
             aria-selected={view === 'back'}
             onClick={() => setView('back')}
-            className={cn(
-              'px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider min-h-[38px] transition-colors cursor-pointer',
-              view === 'back'
-                ? 'bg-[var(--accent)] text-white'
-                : 'text-[var(--text-muted)] hover:text-[var(--text)]'
-            )}
+            data-active={view === 'back'}
+            className="segment px-4 py-2 text-xs min-h-[38px]"
           >
             Posterior
           </button>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)]">
+          <span className="text-xs font-medium px-3 py-1.5 rounded-[24px] bg-[var(--surface-elevated)] text-[var(--text-secondary)] tabular-nums">
             {selected.length}/{maxSelection} músculos
           </span>
           {selected.length > 0 && (
@@ -281,30 +273,30 @@ export function MuscleMapSVG({
               type="button"
               onClick={() => onChange([])}
               aria-label="Limpiar selección muscular"
-              className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] cursor-pointer"
+              className="p-2 rounded-[8px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-elevated)] cursor-pointer"
             >
-              <RotateCcw className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" strokeWidth={1.6} />
             </button>
           )}
         </div>
       </div>
 
       {/* Leyenda */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-elevated)] px-3 py-2 rounded-xl border border-[var(--border)]">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-muted)] bg-[var(--surface-elevated)] px-3.5 py-2.5 rounded-[5px]">
         <span>Toca 1 vez: Prioridad 1 (+30%) · 2 veces: Prioridad 2 (+50%)</span>
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> P1
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--amp-glow)]" /> P1
           </span>
           <span className="inline-flex items-center gap-1">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#E11D2E]" /> P2
+            <span className="h-2.5 w-2.5 rounded-full bg-[var(--accent)]" /> P2
           </span>
         </div>
       </div>
 
       {/* Mapa SVG interactivo */}
-      <div className="relative flex flex-col items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
-        <div className="h-5 mb-1 text-xs font-semibold text-[var(--accent)]">
+      <div className="relative flex flex-col items-center justify-center rounded-[5px] border border-[var(--border)] bg-[var(--surface)] p-5">
+        <div className="h-5 mb-2 text-xs font-medium text-[var(--text-secondary)]">
           {hovered ? MUSCLE_LABELS[hovered] : `Silueta ${isF ? 'femenina' : 'masculina'} · Vista ${view === 'front' ? 'frontal' : 'posterior'}`}
         </div>
 
@@ -361,17 +353,17 @@ export function MuscleMapSVG({
             const isHovered = hovered === zone.id;
             const atLimit = !level && selected.length >= maxSelection;
 
-            let fill = 'rgba(148, 163, 184, 0.22)';
-            let stroke = 'rgba(148, 163, 184, 0.45)';
+            let fill = 'rgba(122, 123, 123, 0.16)';
+            let stroke = 'rgba(122, 123, 123, 0.40)';
             if (level === 1) {
-              fill = 'rgba(245, 158, 11, 0.72)';
-              stroke = '#F59E0B';
+              fill = 'rgba(255, 160, 105, 0.80)';
+              stroke = '#ffa069';
             } else if (level === 2) {
-              fill = 'rgba(225, 29, 46, 0.88)';
-              stroke = '#FF4D5E';
+              fill = 'rgba(255, 97, 5, 0.92)';
+              stroke = '#ff6105';
             } else if (isHovered && !atLimit) {
-              fill = 'rgba(225, 29, 46, 0.35)';
-              stroke = '#E11D2E';
+              fill = 'rgba(255, 97, 5, 0.22)';
+              stroke = '#ff6105';
             }
 
             return (
@@ -414,23 +406,23 @@ export function MuscleMapSVG({
       {/* Músculos seleccionados con control rápido de prioridad 1 / 2 */}
       {selected.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <p className="eyebrow">
             Tus músculos prioritarios
           </p>
-          <div className="grid grid-cols-1 gap-2">
+          <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
             {selected.map((item) => (
               <div
                 key={item.muscle}
-                className="flex items-center justify-between gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+                className="flex items-center justify-between gap-2 py-2.5"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <Flame
                     className={cn(
                       'h-4 w-4 shrink-0',
-                      item.level === 2 ? 'text-[#E11D2E]' : 'text-amber-500'
+                      item.level === 2 ? 'text-[var(--accent)]' : 'text-[var(--amp-glow)]'
                     )}
                   />
-                  <span className="text-sm font-semibold truncate">
+                  <span className="text-sm font-medium truncate">
                     {MUSCLE_LABELS[item.muscle]}
                   </span>
                 </div>
@@ -439,9 +431,9 @@ export function MuscleMapSVG({
                     type="button"
                     onClick={() => setMuscleLevel(item.muscle, 1)}
                     className={cn(
-                      'px-2.5 py-1 rounded-lg text-xs font-bold min-h-[34px] cursor-pointer',
+                      'px-3 py-1 rounded-[8px] text-xs font-medium min-h-[34px] cursor-pointer transition-colors',
                       item.level === 1
-                        ? 'bg-amber-500 text-black'
+                        ? 'bg-[var(--amp-glow)] text-[var(--ink)]'
                         : 'bg-[var(--surface-elevated)] text-[var(--text-muted)]'
                     )}
                   >
@@ -451,9 +443,9 @@ export function MuscleMapSVG({
                     type="button"
                     onClick={() => setMuscleLevel(item.muscle, 2)}
                     className={cn(
-                      'px-2.5 py-1 rounded-lg text-xs font-bold min-h-[34px] cursor-pointer',
+                      'px-3 py-1 rounded-[8px] text-xs font-medium min-h-[34px] cursor-pointer transition-colors',
                       item.level === 2
-                        ? 'bg-[#E11D2E] text-white'
+                        ? 'bg-[var(--accent)] text-white'
                         : 'bg-[var(--surface-elevated)] text-[var(--text-muted)]'
                     )}
                   >
@@ -463,7 +455,7 @@ export function MuscleMapSVG({
                     type="button"
                     onClick={() => removeMuscle(item.muscle)}
                     aria-label={`Quitar ${MUSCLE_LABELS[item.muscle]}`}
-                    className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
+                    className="p-1.5 rounded-[8px] text-[var(--text-muted)] hover:text-[var(--text)] cursor-pointer"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -475,8 +467,8 @@ export function MuscleMapSVG({
       )}
 
       {/* Selector rápido accesible de los 19 músculos */}
-      <details className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
-        <summary className="text-xs font-semibold text-[var(--text-muted)] cursor-pointer select-none">
+      <details className="rounded-[5px] border border-[var(--border)] bg-[var(--surface)] p-4">
+        <summary className="text-xs font-medium text-[var(--text-secondary)] cursor-pointer select-none">
           Ver lista completa de los 19 grupos musculares
         </summary>
         <div className="mt-3 flex flex-wrap gap-1.5">
@@ -490,12 +482,12 @@ export function MuscleMapSVG({
                 disabled={disabled}
                 onClick={() => handleToggleMuscle(mId)}
                 className={cn(
-                  'px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors min-h-[36px] cursor-pointer disabled:opacity-40',
+                  'px-3 py-1.5 rounded-[24px] text-xs font-medium border transition-colors min-h-[36px] cursor-pointer disabled:opacity-40',
                   level === 2
-                    ? 'bg-[#E11D2E] text-white border-[#E11D2E]'
+                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
                     : level === 1
-                      ? 'bg-amber-500/20 text-amber-500 border-amber-500/60'
-                      : 'bg-[var(--surface-elevated)] text-[var(--text)] border-[var(--border)] hover:border-[var(--accent)]'
+                      ? 'bg-[var(--accent-soft)] text-[var(--text)] border-[var(--amp-glow)]'
+                      : 'bg-[var(--surface)] text-[var(--text-secondary)] border-[var(--border)] hover:border-[var(--ash)]'
                 )}
               >
                 {MUSCLE_LABELS[mId]}

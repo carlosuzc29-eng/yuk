@@ -11,7 +11,6 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { MedicalDisclaimer } from '@/components/ui/MedicalDisclaimer';
 import { LogOut, Moon, Sun, Monitor, SlidersHorizontal, Users } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
 
 export default function PerfilPage() {
   const router = useRouter();
@@ -44,8 +43,8 @@ export default function PerfilPage() {
   return (
     <AppShell title="Perfil" subtitle={user.email}>
       <div className="space-y-4">
-        <Card className="p-4 space-y-2">
-          <p className="font-display text-2xl font-extrabold uppercase">
+        <Card className="p-5 space-y-2">
+          <p className="font-display text-[28px]">
             {profile?.displayName || user.displayName}
           </p>
           {profile && (
@@ -54,7 +53,7 @@ export default function PerfilPage() {
               {profile.daysPerWeek} días/semana
             </p>
           )}
-          <div className="pt-2 flex flex-wrap gap-2">
+          <div className="pt-3 flex flex-wrap gap-2">
             <Link href="/onboarding">
               <Button variant="secondary">
                 <SlidersHorizontal className="h-4 w-4" /> Editar perfil y mapa muscular
@@ -69,8 +68,8 @@ export default function PerfilPage() {
         </Card>
 
         {/* Control de tema 3 estados (Sistema / Oscuro / Claro) */}
-        <Card className="p-4 space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+        <Card className="p-5 space-y-3">
+          <h2 className="eyebrow">
             Apariencia
           </h2>
           <div className="grid grid-cols-3 gap-2">
@@ -79,14 +78,10 @@ export default function PerfilPage() {
                 key={id}
                 type="button"
                 onClick={() => setPreference(id)}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1.5 rounded-xl border p-2.5 text-xs font-semibold min-h-[58px] cursor-pointer transition-colors',
-                  preference === id
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)]'
-                    : 'border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)]'
-                )}
+                data-active={preference === id}
+                className="choice flex flex-col items-center justify-center gap-1.5 p-2.5 text-xs font-medium min-h-[64px]"
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" strokeWidth={1.6} />
                 <span className="text-center leading-tight">{label}</span>
               </button>
             ))}

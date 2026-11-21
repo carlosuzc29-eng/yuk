@@ -23,7 +23,6 @@ import {
   type Sex,
   type UserProfile,
 } from '@/types/user';
-import { cn } from '@/lib/utils/cn';
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react';
 
 const TOTAL_STEPS = 7; // 6 pasos de entrada + pantalla de resumen
@@ -225,14 +224,12 @@ export default function OnboardingPage() {
   const progressPct = Math.round(((step + 1) / TOTAL_STEPS) * 100);
 
   return (
-    <div className="min-h-dvh max-w-lg mx-auto px-4 py-5 flex flex-col">
+    <div className="min-h-dvh max-w-lg mx-auto px-5 py-6 flex flex-col">
       {/* Cabecera y barra de progreso */}
-      <header className="space-y-3 mb-5">
+      <header className="space-y-4 mb-6">
         <div className="flex items-center justify-between">
-          <span className="font-display text-xl font-extrabold uppercase tracking-wider text-[var(--accent)]">
-            YUK
-          </span>
-          <span className="text-xs font-semibold text-[var(--text-muted)]">
+          <span className="text-[20px] font-light tracking-[-0.04em]">yuk</span>
+          <span className="rounded-[8px] bg-[var(--accent)] text-white text-xs font-medium px-2.5 py-1">
             Paso {step + 1} de {TOTAL_STEPS}
           </span>
         </div>
@@ -242,14 +239,14 @@ export default function OnboardingPage() {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-label="Progreso del onboarding"
-          className="h-2 w-full rounded-full bg-[var(--surface-elevated)] overflow-hidden"
+          className="h-[2px] w-full rounded-full bg-[var(--border)] overflow-hidden"
         >
           <div
             className="h-full bg-[var(--accent)] transition-all duration-300 rounded-full"
             style={{ width: `${progressPct}%` }}
           />
         </div>
-        <h1 className="font-display text-3xl font-extrabold uppercase tracking-wide">
+        <h1 className="font-display text-[34px] pt-2">
           {STEP_TITLES[step]}
         </h1>
       </header>
@@ -267,9 +264,9 @@ export default function OnboardingPage() {
           >
             {/* PASO 1: Datos */}
             {step === 0 && (
-              <Card className="p-4 space-y-4">
+              <Card className="p-5 space-y-5">
                 <div className="space-y-1.5">
-                  <label htmlFor="ob-name" className="block text-sm font-medium">
+                  <label htmlFor="ob-name" className="field-label pl-1">
                     ¿Cómo quieres que te llamemos?
                   </label>
                   <input
@@ -279,12 +276,12 @@ export default function OnboardingPage() {
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Tu nombre"
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                    className="field"
                   />
                 </div>
 
                 <fieldset className="space-y-1.5">
-                  <legend className="text-sm font-medium">Sexo biológico (para silueta y fórmulas)</legend>
+                  <legend className="field-label pl-1 mb-1.5">Sexo biológico (para silueta y fórmulas)</legend>
                   <div className="grid grid-cols-2 gap-2.5">
                     {(
                       [
@@ -296,12 +293,8 @@ export default function OnboardingPage() {
                         key={opt.id}
                         type="button"
                         onClick={() => setSex(opt.id)}
-                        className={cn(
-                          'min-h-[48px] rounded-xl border font-bold text-sm transition-colors cursor-pointer',
-                          sex === opt.id
-                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'bg-[var(--surface-elevated)] text-[var(--text)] border-[var(--border)]'
-                        )}
+                        data-active={sex === opt.id}
+                        className="choice min-h-[48px] font-medium text-sm"
                       >
                         {opt.label}
                       </button>
@@ -310,7 +303,7 @@ export default function OnboardingPage() {
                 </fieldset>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="ob-birth" className="block text-sm font-medium">
+                  <label htmlFor="ob-birth" className="field-label pl-1">
                     Fecha de nacimiento
                   </label>
                   <input
@@ -318,13 +311,13 @@ export default function OnboardingPage() {
                     type="date"
                     value={birthDate}
                     onChange={(e) => setBirthDate(e.target.value)}
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                    className="field"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label htmlFor="ob-weight" className="block text-sm font-medium">
+                    <label htmlFor="ob-weight" className="field-label pl-1">
                       Peso (kg)
                     </label>
                     <input
@@ -336,11 +329,11 @@ export default function OnboardingPage() {
                       max={250}
                       value={weightKg}
                       onChange={(e) => setWeightKg(e.target.value)}
-                      className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                      className="field"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label htmlFor="ob-height" className="block text-sm font-medium">
+                    <label htmlFor="ob-height" className="field-label pl-1">
                       Altura (cm)
                     </label>
                     <input
@@ -351,13 +344,13 @@ export default function OnboardingPage() {
                       max={230}
                       value={heightCm}
                       onChange={(e) => setHeightCm(e.target.value)}
-                      className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                      className="field"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label htmlFor="ob-bf" className="block text-sm font-medium">
+                  <label htmlFor="ob-bf" className="field-label pl-1">
                     % de grasa corporal <span className="text-[var(--text-muted)]">(opcional)</span>
                   </label>
                   <input
@@ -370,7 +363,7 @@ export default function OnboardingPage() {
                     value={bodyFatPct}
                     onChange={(e) => setBodyFatPct(e.target.value)}
                     placeholder="Ej. 18"
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                    className="field"
                   />
                 </div>
               </Card>
@@ -387,15 +380,11 @@ export default function OnboardingPage() {
                     key={opt.id}
                     type="button"
                     onClick={() => setExperience(opt.id)}
-                    className={cn(
-                      'w-full text-left rounded-2xl border p-4 transition-all cursor-pointer min-h-[64px]',
-                      experience === opt.id
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                        : 'border-[var(--border)] bg-[var(--surface)]'
-                    )}
+                    data-active={experience === opt.id}
+                    className="choice !rounded-[5px] w-full text-left p-4 min-h-[64px]"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-base">{opt.label}</span>
+                      <span className="font-medium text-base text-[var(--text)]">{opt.label}</span>
                       {experience === opt.id && (
                         <CheckCircle2 className="h-5 w-5 text-[var(--accent)]" />
                       )}
@@ -410,19 +399,15 @@ export default function OnboardingPage() {
             {step === 2 && (
               <div className="space-y-4">
                 <Card className="p-4 space-y-3">
-                  <p className="text-sm font-semibold">¿Cuántos días por semana puedes entrenar?</p>
+                  <p className="text-sm font-medium">¿Cuántos días por semana puedes entrenar?</p>
                   <div className="grid grid-cols-5 gap-2">
                     {[2, 3, 4, 5, 6].map((d) => (
                       <button
                         key={d}
                         type="button"
                         onClick={() => setDaysPerWeek(d)}
-                        className={cn(
-                          'min-h-[48px] rounded-xl border font-display text-2xl font-extrabold cursor-pointer',
-                          daysPerWeek === d
-                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'bg-[var(--surface-elevated)] border-[var(--border)]'
-                        )}
+                        data-active={daysPerWeek === d}
+                        className="choice min-h-[52px] text-2xl font-light tabular-nums"
                       >
                         {d}
                       </button>
@@ -431,19 +416,15 @@ export default function OnboardingPage() {
                 </Card>
 
                 <Card className="p-4 space-y-3">
-                  <p className="text-sm font-semibold">Minutos disponibles por sesión</p>
+                  <p className="text-sm font-medium">Minutos disponibles por sesión</p>
                   <div className="grid grid-cols-5 gap-2">
                     {SESSION_MINUTES.map((m) => (
                       <button
                         key={m}
                         type="button"
                         onClick={() => setSessionMinutes(m)}
-                        className={cn(
-                          'min-h-[46px] rounded-xl border text-sm font-bold cursor-pointer',
-                          sessionMinutes === m
-                            ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'bg-[var(--surface-elevated)] border-[var(--border)]'
-                        )}
+                        data-active={sessionMinutes === m}
+                        className="choice min-h-[46px] text-sm font-medium tabular-nums"
                       >
                         {m}m
                       </button>
@@ -452,7 +433,7 @@ export default function OnboardingPage() {
                 </Card>
 
                 <Card className="p-4 space-y-3">
-                  <p className="text-sm font-semibold">¿Con qué equipo cuentas? (puedes elegir varios)</p>
+                  <p className="text-sm font-medium">¿Con qué equipo cuentas? (puedes elegir varios)</p>
                   <div className="grid grid-cols-1 gap-2">
                     {(Object.keys(EQUIPMENT_LABELS) as EquipmentType[]).map((eq) => {
                       const active = equipment.includes(eq);
@@ -461,12 +442,8 @@ export default function OnboardingPage() {
                           key={eq}
                           type="button"
                           onClick={() => toggleEquipment(eq)}
-                          className={cn(
-                            'flex items-center justify-between min-h-[48px] rounded-xl border px-4 text-sm font-semibold cursor-pointer',
-                            active
-                              ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--text)]'
-                              : 'border-[var(--border)] bg-[var(--surface-elevated)] text-[var(--text-muted)]'
-                          )}
+                          data-active={active}
+                          className="choice flex items-center justify-between min-h-[48px] px-4 text-sm font-medium"
                         >
                           <span>{EQUIPMENT_LABELS[eq]}</span>
                           {active && <CheckCircle2 className="h-4 w-4 text-[var(--accent)]" />}
@@ -493,14 +470,8 @@ export default function OnboardingPage() {
                         key={inj}
                         type="button"
                         onClick={() => toggleInjury(inj)}
-                        className={cn(
-                          'min-h-[48px] rounded-xl border px-3 text-sm font-semibold transition-colors cursor-pointer',
-                          active
-                            ? inj === 'ninguna'
-                              ? 'bg-emerald-600 text-white border-emerald-600'
-                              : 'bg-[var(--accent)] text-white border-[var(--accent)]'
-                            : 'bg-[var(--surface)] border-[var(--border)] text-[var(--text)]'
-                        )}
+                        data-active={active}
+                        className="choice min-h-[48px] px-3 text-sm font-medium"
                       >
                         {INJURY_LABELS[inj]}
                       </button>
@@ -519,15 +490,11 @@ export default function OnboardingPage() {
                     key={g}
                     type="button"
                     onClick={() => setGoal(g)}
-                    className={cn(
-                      'w-full text-left rounded-2xl border p-4 transition-all cursor-pointer min-h-[68px]',
-                      goal === g
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                        : 'border-[var(--border)] bg-[var(--surface)]'
-                    )}
+                    data-active={goal === g}
+                    className="choice !rounded-[5px] w-full text-left p-4 min-h-[68px]"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-base">{GOAL_LABELS[g].label}</span>
+                      <span className="font-medium text-base text-[var(--text)]">{GOAL_LABELS[g].label}</span>
                       {goal === g && <CheckCircle2 className="h-5 w-5 text-[var(--accent)]" />}
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-1">{GOAL_LABELS[g].desc}</p>
@@ -540,7 +507,7 @@ export default function OnboardingPage() {
             {step === 5 && (
               <div className="space-y-3">
                 <p className="text-sm text-[var(--text-muted)]">
-                  Elige hasta <strong>4 músculos prioritarios</strong>. Recibirán volumen extra y
+                  Elige hasta <span className="font-medium text-[var(--text)]">4 músculos prioritarios</span>. Recibirán volumen extra y
                   aparecerán al inicio de tus sesiones.
                 </p>
                 <MuscleMapSVG
@@ -555,46 +522,46 @@ export default function OnboardingPage() {
             {/* PASO 7: Pantalla de resumen */}
             {step === 6 && (
               <div className="space-y-4">
-                <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-[var(--text)]">
-                  <Info className="h-4 w-4 text-[var(--warning)] shrink-0 mt-0.5" />
+                <div className="flex items-start gap-2.5 rounded-[5px] bg-[var(--surface-elevated)] border border-[var(--border)] p-3.5 text-xs leading-relaxed text-[var(--text-secondary)]">
+                  <Info className="h-4 w-4 text-[var(--text-muted)] shrink-0 mt-0.5" strokeWidth={1.6} />
                   <span>
-                    <strong>Estas cifras son estimaciones</strong> basadas en la ecuación Mifflin-St
+                    <span className="font-medium text-[var(--text)]">Estas cifras son estimaciones</span> basadas en la ecuación Mifflin-St
                     Jeor y tu nivel de actividad declarado. Las iremos ajustando cada 2 semanas según
                     tu progreso real.
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Card className="p-3.5">
-                    <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                  <Card className="p-4">
+                    <p className="eyebrow !text-[11px] !tracking-[0.06em]">
                       IMC estimado
                     </p>
-                    <p className="font-display text-3xl font-extrabold mt-0.5">
+                    <p className="font-display text-[30px] mt-2 tabular-nums">
                       {nutritionEstimate.bmi}
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">
                       {nutritionEstimate.bmiCategory}
                     </p>
                   </Card>
-                  <Card className="p-3.5">
-                    <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                  <Card className="p-4">
+                    <p className="eyebrow !text-[11px] !tracking-[0.06em]">
                       Metabolismo basal
                     </p>
-                    <p className="font-display text-3xl font-extrabold mt-0.5">
+                    <p className="font-display text-[30px] mt-2 tabular-nums">
                       {nutritionEstimate.bmr}{' '}
-                      <span className="text-sm font-sans font-normal text-[var(--text-muted)]">
+                      <span className="text-sm tracking-normal text-[var(--text-muted)]">
                         kcal
                       </span>
                     </p>
                     <p className="text-xs text-[var(--text-muted)]">Mifflin-St Jeor</p>
                   </Card>
-                  <Card className="p-3.5">
-                    <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+                  <Card className="p-4">
+                    <p className="eyebrow !text-[11px] !tracking-[0.06em]">
                       Gasto diario (TDEE)
                     </p>
-                    <p className="font-display text-3xl font-extrabold mt-0.5">
+                    <p className="font-display text-[30px] mt-2 tabular-nums">
                       {nutritionEstimate.tdee}{' '}
-                      <span className="text-sm font-sans font-normal text-[var(--text-muted)]">
+                      <span className="text-sm tracking-normal text-[var(--text-muted)]">
                         kcal
                       </span>
                     </p>
@@ -602,13 +569,13 @@ export default function OnboardingPage() {
                       {daysPerWeek} días · {sessionMinutes} min
                     </p>
                   </Card>
-                  <Card className="p-3.5 border-[var(--accent)]/60">
-                    <p className="text-[11px] uppercase tracking-wider text-[var(--accent)] font-bold">
+                  <Card featured className="p-4">
+                    <p className="eyebrow !text-[11px] !tracking-[0.06em] !text-[var(--text-secondary)]">
                       Calorías objetivo
                     </p>
-                    <p className="font-display text-3xl font-extrabold text-[var(--accent)] mt-0.5">
+                    <p className="font-display text-[30px] mt-2 tabular-nums">
                       {nutritionEstimate.targetCalories}{' '}
-                      <span className="text-sm font-sans font-normal text-[var(--text-muted)]">
+                      <span className="text-sm tracking-normal text-[var(--text-muted)]">
                         kcal
                       </span>
                     </p>
@@ -622,47 +589,47 @@ export default function OnboardingPage() {
                   </Card>
                 </div>
 
-                <Card className="p-4 space-y-3">
-                  <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                <Card className="p-5 space-y-4">
+                  <h2 className="eyebrow">
                     Macros diarios estimados
                   </h2>
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="rounded-xl bg-[var(--surface-elevated)] p-3">
+                  <div className="grid grid-cols-3 divide-x divide-[var(--border)] text-center">
+                    <div className="px-2">
                       <p className="text-xs text-[var(--text-muted)]">Proteína</p>
-                      <p className="font-display text-2xl font-extrabold text-[var(--accent)]">
+                      <p className="font-display text-[26px] mt-1 tabular-nums">
                         {nutritionEstimate.proteinG}g
                       </p>
-                      <p className="text-[10px] text-[var(--text-muted)]">
+                      <p className="text-[11px] text-[var(--ash)] mt-0.5">
                         {nutritionEstimate.proteinPerKg} g/kg
                       </p>
                     </div>
-                    <div className="rounded-xl bg-[var(--surface-elevated)] p-3">
+                    <div className="px-2">
                       <p className="text-xs text-[var(--text-muted)]">Carbos</p>
-                      <p className="font-display text-2xl font-extrabold">
+                      <p className="font-display text-[26px] mt-1 tabular-nums">
                         {nutritionEstimate.carbsG}g
                       </p>
-                      <p className="text-[10px] text-[var(--text-muted)]">Energía</p>
+                      <p className="text-[11px] text-[var(--ash)] mt-0.5">Energía</p>
                     </div>
-                    <div className="rounded-xl bg-[var(--surface-elevated)] p-3">
+                    <div className="px-2">
                       <p className="text-xs text-[var(--text-muted)]">Grasas</p>
-                      <p className="font-display text-2xl font-extrabold">
+                      <p className="font-display text-[26px] mt-1 tabular-nums">
                         {nutritionEstimate.fatG}g
                       </p>
-                      <p className="text-[10px] text-[var(--text-muted)]">Hormonal</p>
+                      <p className="text-[11px] text-[var(--ash)] mt-0.5">Hormonal</p>
                     </div>
                   </div>
                 </Card>
 
                 {priorityMuscles.length > 0 && (
-                  <Card className="p-4 space-y-2">
-                    <p className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  <Card className="p-5 space-y-3">
+                    <p className="eyebrow">
                       Énfasis muscular seleccionado
                     </p>
                     <div className="flex flex-wrap gap-1.5">
                       {priorityMuscles.map((m) => (
                         <span
                           key={m.muscle}
-                          className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--accent)]/15 text-[var(--accent)]"
+                          className="text-xs font-medium px-3 py-1.5 rounded-[24px] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"
                         >
                           {MUSCLE_LABELS[m.muscle]} (P{m.level})
                         </span>
@@ -679,13 +646,13 @@ export default function OnboardingPage() {
       </div>
 
       {error && (
-        <p role="alert" className="mt-3 text-xs font-medium text-red-400 bg-red-950/40 border border-red-800/50 rounded-xl p-3">
+        <p role="alert" className="mt-4 alert alert-error">
           {error}
         </p>
       )}
 
       {/* Navegación inferior del wizard */}
-      <footer className="mt-6 pt-3 border-t border-[var(--border)] flex items-center gap-3">
+      <footer className="mt-8 pt-4 border-t border-[var(--border)] flex items-center gap-3">
         {step > 0 && (
           <Button variant="secondary" size="lg" onClick={prevStep} className="shrink-0">
             <ArrowLeft className="h-4 w-4" /> Atrás

@@ -1,19 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import { Barlow_Condensed, Inter } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 
-const barlowCondensed = Barlow_Condensed({
-  subsets: ['latin'],
-  weight: ['600', '700', '800'],
-  variable: '--font-barlow-condensed',
-  display: 'swap',
-});
-
 const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['300', '400', '500'],
   variable: '--font-inter',
   display: 'swap',
 });
@@ -36,7 +29,10 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
-  themeColor: '#0E1014',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#111211' },
+  ],
 };
 
 const FOUC_SCRIPT = `
@@ -57,7 +53,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-419"
-      className={`${barlowCondensed.variable} ${inter.variable}`}
+      className={inter.variable}
       suppressHydrationWarning
     >
       <head>

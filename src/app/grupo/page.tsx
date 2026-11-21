@@ -70,15 +70,14 @@ export default function GrupoPage() {
   };
 
   return (
-    <div className="min-h-dvh max-w-lg mx-auto px-5 py-8 space-y-6">
+    <div className="min-h-dvh max-w-lg mx-auto px-5 py-10 space-y-8">
       <div>
-        <span className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">
-          Tu equipo de entrenamiento
-        </span>
-        <h1 className="font-display text-4xl font-extrabold uppercase mt-1">
+        <p className="eyebrow">Tu equipo de entrenamiento</p>
+        <h1 className="font-display text-[40px] mt-3">
           {group ? group.name : 'Crea o únete a un grupo'}
         </h1>
-        <p className="text-sm text-[var(--text-muted)] mt-1">
+        <span className="accent-rule mt-4" aria-hidden="true" />
+        <p className="text-base text-[var(--text-secondary)] mt-4 leading-relaxed">
           Comparte constancia, rachas y retos con tus amigos. Tu peso corporal, medidas y fotos
           nunca se muestran al grupo.
         </p>
@@ -86,13 +85,13 @@ export default function GrupoPage() {
 
       {group ? (
         <div className="space-y-4">
-          <Card className="p-5 space-y-4">
-            <div className="flex items-center justify-between">
+          <Card featured className="p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-wider text-[var(--text-muted)]">
+                <p className="eyebrow !text-[var(--text-secondary)]">
                   Código de invitación (6 caracteres)
                 </p>
-                <p className="font-display text-4xl font-extrabold tracking-[0.2em] text-[var(--accent)] mt-1">
+                <p className="font-display text-[40px] !tracking-[0.18em] tabular-nums mt-2">
                   {group.inviteCode}
                 </p>
               </div>
@@ -101,27 +100,27 @@ export default function GrupoPage() {
                 {copied ? 'Copiado' : 'Copiar'}
               </Button>
             </div>
-            <p className="text-xs text-[var(--text-muted)]">
+            <p className="text-xs text-[var(--text-secondary)]">
               Envía este código a tus amigos para que se unan como miembros.
             </p>
           </Card>
 
-          <Card className="p-4 space-y-3">
+          <Card className="p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-[var(--accent)]" />
-              <h2 className="text-sm font-bold uppercase tracking-wider">
+              <Users className="h-4 w-4 text-[var(--text-muted)]" strokeWidth={1.6} />
+              <h2 className="eyebrow">
                 Miembros ({groupMembers.length})
               </h2>
             </div>
-            <ul className="space-y-2">
+            <ul className="divide-y divide-[var(--border)]">
               {groupMembers.map((m) => (
                 <li
                   key={m.uid}
-                  className="flex items-center justify-between rounded-xl bg-[var(--surface-elevated)] px-3 py-2.5 text-sm"
+                  className="flex items-center justify-between py-3 text-sm"
                 >
-                  <span className="font-semibold">{m.displayName}</span>
-                  <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--surface)] border border-[var(--border)]">
-                    {m.role === 'admin' && <Crown className="h-3.5 w-3.5 text-amber-500" />}
+                  <span className="font-medium">{m.displayName}</span>
+                  <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-[8px] text-[var(--text-secondary)] bg-[var(--surface-elevated)]">
+                    {m.role === 'admin' && <Crown className="h-3.5 w-3.5 text-[var(--accent)]" strokeWidth={1.8} />}
                     {m.role === 'admin' ? 'Admin' : 'Miembro'}
                   </span>
                 </li>
@@ -135,18 +134,15 @@ export default function GrupoPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)]">
+          <div className="grid grid-cols-2 gap-1 p-1 rounded-[24px] bg-[var(--surface-elevated)]">
             <button
               type="button"
               onClick={() => {
                 setMode('create');
                 setError('');
               }}
-              className={`py-2.5 rounded-lg text-sm font-bold transition-colors min-h-[44px] cursor-pointer ${
-                mode === 'create'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-muted)]'
-              }`}
+              data-active={mode === 'create'}
+              className="segment py-2.5 text-sm min-h-[44px]"
             >
               Crear grupo
             </button>
@@ -156,21 +152,18 @@ export default function GrupoPage() {
                 setMode('join');
                 setError('');
               }}
-              className={`py-2.5 rounded-lg text-sm font-bold transition-colors min-h-[44px] cursor-pointer ${
-                mode === 'join'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'text-[var(--text-muted)]'
-              }`}
+              data-active={mode === 'join'}
+              className="segment py-2.5 text-sm min-h-[44px]"
             >
               Unirme con código
             </button>
           </div>
 
-          <Card className="p-5">
+          <Card className="p-6">
             {mode === 'create' ? (
               <form onSubmit={handleCreate} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="group-name" className="block text-sm font-medium">
+                  <label htmlFor="group-name" className="field-label pl-1">
                     Nombre de tu grupo
                   </label>
                   <input
@@ -183,14 +176,14 @@ export default function GrupoPage() {
                     value={groupName}
                     onChange={(e) => setGroupName(e.target.value)}
                     placeholder="Ej. Team Hierro 7AM"
-                    className="w-full min-h-[46px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-3.5 text-sm"
+                    className="field"
                   />
-                  <p className="text-xs text-[var(--text-muted)]">
+                  <p className="text-xs text-[var(--text-muted)] pl-1">
                     Serás el admin del grupo y podrás crear retos grupales.
                   </p>
                 </div>
                 {error && (
-                  <p role="alert" className="text-xs text-red-400">
+                  <p role="alert" className="alert alert-error">
                     {error}
                   </p>
                 )}
@@ -201,7 +194,7 @@ export default function GrupoPage() {
             ) : (
               <form onSubmit={handleJoin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label htmlFor="invite-code" className="block text-sm font-medium">
+                  <label htmlFor="invite-code" className="field-label pl-1">
                     Código de invitación (6 caracteres)
                   </label>
                   <input
@@ -213,11 +206,11 @@ export default function GrupoPage() {
                     value={inviteCode}
                     onChange={(e) => setInviteCode(normalizeInviteCode(e.target.value))}
                     placeholder="Ej. F7K9Q2"
-                    className="w-full min-h-[52px] rounded-xl border border-[var(--border)] bg-[var(--surface-elevated)] px-4 text-center font-display text-2xl font-extrabold tracking-[0.25em] uppercase"
+                    className="field !min-h-[60px] text-center !text-[28px] font-light tracking-[0.25em] uppercase tabular-nums"
                   />
                 </div>
                 {error && (
-                  <p role="alert" className="text-xs text-red-400">
+                  <p role="alert" className="alert alert-error">
                     {error}
                   </p>
                 )}
@@ -231,7 +224,7 @@ export default function GrupoPage() {
           <div className="text-center">
             <Link
               href="/hoy"
-              className="text-sm font-medium text-[var(--text-muted)] hover:text-[var(--text)] underline"
+              className="text-sm text-[var(--text-muted)] hover:text-[var(--text)] underline underline-offset-4"
             >
               Hacerlo después e ir a mi panel
             </Link>

@@ -33,27 +33,25 @@ export default function HoyPage() {
       rightSlot={
         <Link
           href="/grupo"
-          className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold touch-target"
+          className="inline-flex items-center gap-1.5 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] touch-target shrink-0"
         >
-          <Users className="h-4 w-4 text-[var(--accent)]" />
+          <Users className="h-4 w-4" strokeWidth={1.6} />
           {group ? group.name : 'Unirme'}
         </Link>
       }
     >
       <div className="space-y-4">
-        <Card className="p-5 space-y-3 border-[var(--accent)]/40">
+        <Card featured className="p-6 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
+            <span className="rounded-[8px] bg-[var(--accent)] text-white text-xs font-medium px-2.5 py-1">
               Tu plan personalizado
             </span>
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="text-xs text-[var(--text-secondary)]">
               {profile.daysPerWeek} días/sem · {profile.sessionMinutes} min
             </span>
           </div>
-          <h2 className="font-display text-3xl font-extrabold uppercase">
-            Perfil listo para forjar
-          </h2>
-          <p className="text-sm text-[var(--text-muted)]">
+          <h2 className="font-display text-[32px]">Tu perfil está listo</h2>
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
             Tu perfil biométrico, disponibilidad y énfasis muscular ya están guardados. En las
             próximas fases activaremos el catálogo de 80+ ejercicios animados, el generador de
             rutinas y el modo entrenamiento offline.
@@ -69,46 +67,46 @@ export default function HoyPage() {
         </Card>
 
         {/* Resumen rápido nutricional */}
-        <Card className="p-4 space-y-3">
+        <Card className="p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            <h3 className="eyebrow">
               Objetivo nutricional estimado
             </h3>
-            <span className="text-[11px] text-[var(--text-muted)]">Estimación</span>
+            <span className="text-[11px] text-[var(--ash)]">Estimación</span>
           </div>
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="rounded-xl bg-[var(--surface-elevated)] p-2.5">
-              <p className="font-display text-xl font-extrabold text-[var(--accent)]">
+          <div className="grid grid-cols-4 divide-x divide-[var(--border)] text-center">
+            <div className="px-1 py-1">
+              <p className="font-display text-[26px] leading-none">
                 {profile.nutritionEstimate.targetCalories}
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">kcal</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">kcal</p>
             </div>
-            <div className="rounded-xl bg-[var(--surface-elevated)] p-2.5">
-              <p className="font-display text-xl font-extrabold">
+            <div className="px-1 py-1">
+              <p className="font-display text-[26px] leading-none">
                 {profile.nutritionEstimate.proteinG}g
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">Prot</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Prot</p>
             </div>
-            <div className="rounded-xl bg-[var(--surface-elevated)] p-2.5">
-              <p className="font-display text-xl font-extrabold">
+            <div className="px-1 py-1">
+              <p className="font-display text-[26px] leading-none">
                 {profile.nutritionEstimate.carbsG}g
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">Carbos</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Carbos</p>
             </div>
-            <div className="rounded-xl bg-[var(--surface-elevated)] p-2.5">
-              <p className="font-display text-xl font-extrabold">
+            <div className="px-1 py-1">
+              <p className="font-display text-[26px] leading-none">
                 {profile.nutritionEstimate.fatG}g
               </p>
-              <p className="text-[10px] text-[var(--text-muted)]">Grasas</p>
+              <p className="text-[11px] text-[var(--text-muted)] mt-1.5">Grasas</p>
             </div>
           </div>
         </Card>
 
         {/* Músculos de énfasis */}
-        <Card className="p-4 space-y-2.5">
+        <Card className="p-5 space-y-3">
           <div className="flex items-center gap-2">
-            <Flame className="h-4 w-4 text-[var(--accent)]" />
-            <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            <Flame className="h-4 w-4 text-[var(--text-muted)]" strokeWidth={1.6} />
+            <h3 className="eyebrow">
               Músculos prioritarios
             </h3>
           </div>
@@ -117,7 +115,7 @@ export default function HoyPage() {
               {profile.priorityMuscles.map((m) => (
                 <span
                   key={m.muscle}
-                  className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[var(--surface-elevated)] border border-[var(--border)]"
+                  className="text-xs font-medium px-3 py-1.5 rounded-[24px] bg-[var(--surface-elevated)] text-[var(--text-secondary)]"
                 >
                   {MUSCLE_LABELS[m.muscle]} · P{m.level}
                 </span>

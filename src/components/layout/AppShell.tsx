@@ -50,17 +50,15 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh flex flex-col max-w-lg mx-auto bg-[var(--bg)]">
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-[var(--bg)]/90 border-b border-[var(--border)] px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2.5 w-2.5 rounded-full bg-[var(--accent)]" />
-              <h1 className="font-display text-2xl font-extrabold uppercase tracking-wide leading-none">
-                {title}
-              </h1>
-            </div>
+      <header className="sticky top-0 z-30 backdrop-blur-xl bg-[var(--bg)]/85 border-b border-[var(--border)] px-5 pt-5 pb-4">
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="font-display text-[32px] leading-none tracking-[-0.03em] text-[var(--text)]">
+              {title}
+            </h1>
+            <span className="accent-rule mt-3" aria-hidden="true" />
             {subtitle && (
-              <p className="text-xs text-[var(--text-muted)] mt-0.5">{subtitle}</p>
+              <p className="text-[13px] text-[var(--text-muted)] mt-2.5 truncate">{subtitle}</p>
             )}
           </div>
           {rightSlot}
@@ -68,21 +66,21 @@ export function AppShell({
         {offline && (
           <div
             role="status"
-            className="mt-2 flex items-center gap-2 rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-1.5 text-xs text-[var(--warning)]"
+            className="mt-3 flex items-center gap-2 rounded-[8px] bg-[var(--surface-elevated)] border border-[var(--border)] px-3 py-2 text-xs text-[var(--text-secondary)]"
           >
-            <WifiOff className="h-3.5 w-3.5 shrink-0" />
+            <WifiOff className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]" />
             <span>Sin conexión. Tus cambios se guardarán y sincronizarán al volver.</span>
           </div>
         )}
       </header>
 
-      <main className="flex-1 px-4 pt-4 pb-24">{children}</main>
+      <main className="flex-1 px-5 pt-6 pb-28">{children}</main>
 
       <nav
         aria-label="Navegación principal"
-        className="fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md"
+        className="fixed bottom-0 inset-x-0 z-40 border-t border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="max-w-lg mx-auto grid grid-cols-6 px-1 py-1">
+        <div className="max-w-lg mx-auto grid grid-cols-6 px-1 py-1.5">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(`${href}/`);
             return (
@@ -90,14 +88,21 @@ export function AppShell({
                 key={href}
                 href={href}
                 className={cn(
-                  'flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl touch-target text-[11px] font-medium transition-colors',
+                  'relative flex flex-col items-center justify-center gap-1 py-1.5 touch-target text-[11px] transition-colors',
                   active
-                    ? 'text-[var(--accent)]'
+                    ? 'text-[var(--text)] font-medium'
                     : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 )}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon className="h-5 w-5" strokeWidth={active ? 2.4 : 1.8} />
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'absolute top-0 h-[2px] w-6 rounded-full bg-[var(--accent)] transition-opacity',
+                    active ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
+                <Icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
                 <span>{label}</span>
               </Link>
             );
