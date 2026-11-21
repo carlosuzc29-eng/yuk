@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yuk-shell-v2';
+const CACHE_NAME = 'yuk-shell-v3';
 // Rutas relativas al scope del SW (funciona igual en raíz o bajo basePath de GitHub Pages).
 const APP_SHELL = [
   './',
@@ -43,9 +43,11 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(
-    caches.match(request, { ignoreSearch: request.mode === 'navigate' }).then((cached) => {
-      const networkFetch = fetch(request)
+  // Navegaciones HTML: network-first para mostrar siempre la versión más reciente
+  // y usar caché automáticamente cuando no hay conexión.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
         .then((response) => {
           if (response && response.status === 200 && response.type === 'basic') {
             const copy = response.clone();
@@ -54,11 +56,29 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() =>
-          cached ||
-          (request.mode === 'navigate'
-            ? caches.match(new URL('./hoy/', self.registration.scope).toString())
-            : undefined)
-        );
+          caches
+            .match(request, { ignoreSearch: true })
+            .then(
+              (cached) =>
+                cached || caches.match(new URL('./hoy/', self.registration.scope).toString())
+            )
+        )
+    );
+    return;
+  }
+
+  // Assets estáticos: stale-while-revalidate
+  event.respondWith(
+    caches.match(request).then((cached) => {
+      const networkFetch = fetch(request)
+        .then((response) => {
+          if (response && response.status === 200 && response.type === 'basic') {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => cached);
       return cached || networkFetch;
     })
   );
