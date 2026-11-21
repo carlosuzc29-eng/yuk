@@ -1,0 +1,135 @@
+@import "tailwindcss";
+
+/* ============================================================
+   FORJA Design System — Modern color-scheme + light-dark()
+   Estética: Grafito oscuro + Rojo disco olímpico + Modo claro AA
+   ============================================================ */
+:root {
+  /* Raw palette tokens */
+  --forja-bg-light: #f4f5f7;
+  --forja-bg-dark: #0e1014;
+
+  --forja-surface-light: #ffffff;
+  --forja-surface-dark: #161a21;
+
+  --forja-surface-elevated-light: #ebedf2;
+  --forja-surface-elevated-dark: #1f242e;
+
+  --forja-border-light: #d5d9e2;
+  --forja-border-dark: #2a313e;
+
+  --forja-text-light: #11141a;
+  --forja-text-dark: #f4f5f7;
+
+  --forja-text-muted-light: #4b5563;
+  --forja-text-muted-dark: #9ca3af;
+
+  --forja-accent-light: #c81425;
+  --forja-accent-dark: #e11d2e;
+
+  --forja-accent-hover-light: #a60f1e;
+  --forja-accent-hover-dark: #ff3346;
+
+  --forja-success-light: #15803d;
+  --forja-success-dark: #22c55e;
+
+  --forja-warning-light: #b45309;
+  --forja-warning-dark: #f59e0b;
+
+  /* Fallback tokens for browsers without light-dark() */
+  --bg: var(--forja-bg-light);
+  --surface: var(--forja-surface-light);
+  --surface-elevated: var(--forja-surface-elevated-light);
+  --border: var(--forja-border-light);
+  --text: var(--forja-text-light);
+  --text-muted: var(--forja-text-muted-light);
+  --accent: var(--forja-accent-light);
+  --accent-hover: var(--forja-accent-hover-light);
+  --success: var(--forja-success-light);
+  --warning: var(--forja-warning-light);
+
+  @media (prefers-color-scheme: dark) {
+    --bg: var(--forja-bg-dark);
+    --surface: var(--forja-surface-dark);
+    --surface-elevated: var(--forja-surface-elevated-dark);
+    --border: var(--forja-border-dark);
+    --text: var(--forja-text-dark);
+    --text-muted: var(--forja-text-muted-dark);
+    --accent: var(--forja-accent-dark);
+    --accent-hover: var(--forja-accent-hover-dark);
+    --success: var(--forja-success-dark);
+    --warning: var(--forja-warning-dark);
+  }
+
+  /* Modern automatic light-dark() tokens */
+  @supports (color: light-dark(white, black)) {
+    --bg: light-dark(var(--forja-bg-light), var(--forja-bg-dark));
+    --surface: light-dark(var(--forja-surface-light), var(--forja-surface-dark));
+    --surface-elevated: light-dark(
+      var(--forja-surface-elevated-light),
+      var(--forja-surface-elevated-dark)
+    );
+    --border: light-dark(var(--forja-border-light), var(--forja-border-dark));
+    --text: light-dark(var(--forja-text-light), var(--forja-text-dark));
+    --text-muted: light-dark(var(--forja-text-muted-light), var(--forja-text-muted-dark));
+    --accent: light-dark(var(--forja-accent-light), var(--forja-accent-dark));
+    --accent-hover: light-dark(var(--forja-accent-hover-light), var(--forja-accent-hover-dark));
+    --success: light-dark(var(--forja-success-light), var(--forja-success-dark));
+    --warning: light-dark(var(--forja-warning-light), var(--forja-warning-dark));
+  }
+
+  /* MANDATORY: Keep base declaration as light dark and map <meta> overrides */
+  color-scheme: light dark;
+  accent-color: var(--accent);
+
+  &:has(> head > meta[name="color-scheme"][content="dark"]) {
+    color-scheme: dark;
+  }
+
+  &:has(> head > meta[name="color-scheme"][content="light"]) {
+    color-scheme: light;
+  }
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-barlow-condensed), "Arial Narrow", sans-serif;
+}
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* Tipografía de títulos condensada estilo gimnasio premium */
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+/* Foco accesible visible (WCAG AA) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Targets táctiles mínimos de 44px para usar con una mano en el gym */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

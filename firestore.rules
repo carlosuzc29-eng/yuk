@@ -1,0 +1,702 @@
+rules_version = '2';
+
+// ===============================================================
+// FORJA Fitness App — Cloud Firestore Security Rules
+// ===============================================================
+//
+// Assumed Data Model
+// ===============================================================
+//
+// 1. Collection: /users/{uid}
+//    Document ID: Firebase Auth UID
+//    Access: Owner only (strictly private; contains PII & biometric profile)
+//    Fields:
+//      - uid: string (optional, must equal {uid}, immutable)
+//      - displayName: string (optional, 1..80 chars)
+//      - email: string (optional, <= 150 chars)
+//      - sex: string (optional, 'male' | 'female')
+//      - age: number (optional, 13..120)
+//      - weightKg: number (optional, 25..350)
+//      - heightCm: number (optional, 100..250)
+//      - goal: string (optional, <= 80 chars)
+//      - experienceLevel: string (optional, <= 40 chars)
+//      - daysPerWeek: number (optional, 1..7)
+//      - sessionMinutes: number (optional, 10..240)
+//      - injuries: list (optional, <= 10 items)
+//      - priorityMuscles: list (optional, <= 4 items)
+//      - equipment: string (<= 80 chars) | list (<= 30 items) (optional)
+//      - groupIds: list (optional, <= 20 items)
+//      - onboardingCompleted: bool (optional)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//      (Privilege fields 'role', 'isAdmin', 'admin' are strictly forbidden)
+//
+// 2. Private Subcollections under /users/{uid} (Owner ONLY — never readable/writable by group members or admins):
+//    - /users/{uid}/routines/{routineId}
+//    - /users/{uid}/workouts/{workoutId}
+//    - /users/{uid}/bodyMetrics/{metricId}
+//    - /users/{uid}/progressPhotos/{photoId}
+//
+// 3. Collection: /groups/{groupId}
+//    Access: Read by group members (or adminUid); create by authenticated user; update/delete by adminUid
+//    Fields:
+//      - name: string (required, 2..60 chars)
+//      - description: string | null (optional, <= 300 chars)
+//      - adminUid: string (required, == request.auth.uid on create)
+//      - inviteCode: string (required, exact length 6)
+//      - memberCount: number (optional, 1..500)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 4. Collection: /groups/{groupId}/members/{memberUid}
+//    Access: Read by group members; create by self (role locked to 'admin' iff group.adminUid == memberUid, else 'member');
+//            update by self (consistency stats only, role immutable) or group admin (role only); delete by admin or self
+//    Allowed Fields ONLY (strictly excludes weightKg, bodyFatPct, waistCm, hipCm, chestCm, armCm, thighCm, progressPhotos):
+//      - uid: string (optional, == memberUid, immutable)
+//      - displayName: string (required, 1..80 chars)
+//      - role: string (required, 'admin' | 'member')
+//      - joinedAt: timestamp (optional, immutable)
+//      - currentStreak: number (optional, 0..10000)
+//      - weeklyPlannedSessions: number (optional, 0..14)
+//      - weeklyCompletedSessions: number (optional, 0..21)
+//      - monthlyCompliancePct: number (optional, 0..100)
+//      - lastWorkoutAt: timestamp | null (optional)
+//      - updatedAt: timestamp (optional)
+//
+// 5. Collection: /groups/{groupId}/feed/{postId}
+//    Access: Read by group members; create by group member (authorUid == auth.uid);
+//            update by author (note only) or group member (reactions & commentCount only);
+//            delete by author or group admin
+//    Fields:
+//      - authorUid: string (required, immutable)
+//      - authorName: string (required, 1..80 chars)
+//      - type: string (optional, 'workout' | 'pr' | 'milestone' | 'challenge' | 'note')
+//      - title: string (optional, 1..120 chars)
+//      - workoutTitle: string (optional, 1..120 chars)
+//      - summary: string (optional, <= 300 chars)
+//      - note: string | null (optional, <= 1000 chars)
+//      - durationMinutes: number (optional, 0..600)
+//      - totalSets: number (optional, 0..500)
+//      - streakCount: number (optional, 0..10000)
+//      - reactions: map (optional, <= 20 keys)
+//      - commentCount: number (optional, 0..100000)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 6. Collection: /groups/{groupId}/feed/{postId}/comments/{commentId}
+//    Access: Read by group members; create by group member (authorUid == auth.uid);
+//            update denied; delete by author or group admin
+//    Fields:
+//      - authorUid: string (required, immutable)
+//      - authorName: string (optional, 1..80 chars)
+//      - text: string (required, 1..500 chars)
+//      - createdAt: timestamp (optional, immutable)
+//
+// 7. Collection: /groups/{groupId}/challenges/{challengeId}
+//    Access: Read by group members; create/delete by group admin;
+//            update by group admin (all fields) or group member (ONLY own UID key inside progressByUid)
+//    Fields:
+//      - title: string (required, 2..100 chars)
+//      - description: string | null (optional, <= 500 chars)
+//      - metricType: string (optional, 1..40 chars)
+//      - targetValue: number (required, > 0 && <= 1000000)
+//      - startDate: timestamp (optional)
+//      - endDate: timestamp (optional)
+//      - status: string (optional, 'upcoming' | 'active' | 'completed' | 'cancelled')
+//      - createdBy: string (optional, immutable)
+//      - progressByUid: map (optional, <= 200 entries)
+//      - createdAt: timestamp (optional, immutable)
+//      - updatedAt: timestamp (optional)
+//
+// 8. Collection: /inviteCodes/{code}
+//    Document ID: 6-character invite code
+//    Access: get by authenticated users; list DENIED; create/update/delete by group adminUid
+//    Fields:
+//      - groupId: string (required, 1..128 chars, immutable)
+//      - groupName: string (optional, 2..60 chars)
+//      - adminUid: string (optional, == auth.uid on create)
+//      - createdAt: timestamp (optional, immutable)
+//
+// 9. Collection: /exercises/{exerciseId}
+//    Access: Read (get, list) by any authenticated user; write DENIED from client (Admin SDK / seed only)
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function uidUnchanged(uid) {
+      return !('uid' in request.resource.data) || request.resource.data.uid == uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function immutableCreatedAt() {
+      return !('createdAt' in resource.data) ||
+        ('createdAt' in request.resource.data && request.resource.data.createdAt == resource.data.createdAt);
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        url.size() <= 1000 &&
+        (url.matches('^https://.*') || url.matches('^http://.*'));
+    }
+
+    function isScopedPath(path, uid) {
+      return path is string &&
+        path.size() <= 300 &&
+        path.matches('^users/' + uid + '/.*');
+    }
+
+    function isOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+        (data[field] is string && data[field].size() >= minLen && data[field].size() <= maxLen);
+    }
+
+    function isOptionalNullableString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is string && data[field].size() >= minLen && data[field].size() <= maxLen);
+    }
+
+    function isOptionalNumberRange(data, field, minVal, maxVal) {
+      return !(field in data) ||
+        (data[field] is number && data[field] >= minVal && data[field] <= maxVal);
+    }
+
+    function isOptionalNullableNumberRange(data, field, minVal, maxVal) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is number && data[field] >= minVal && data[field] <= maxVal);
+    }
+
+    function isOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] is timestamp;
+    }
+
+    function isOptionalNullableTimestamp(data, field) {
+      return !(field in data) || data[field] == null || data[field] is timestamp;
+    }
+
+    function isOptionalList(data, field, maxSize) {
+      return !(field in data) || (data[field] is list && data[field].size() <= maxSize);
+    }
+
+    // Group Membership & Role Helpers
+    function isGroupMember(groupId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+    }
+
+    function isGroupOwner(groupId) {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/groups/$(groupId)) &&
+        get(/databases/$(database)/documents/groups/$(groupId)).data.adminUid == request.auth.uid;
+    }
+
+    function isGroupAdmin(groupId) {
+      return isGroupOwner(groupId) || (
+        isGroupMember(groupId) &&
+        get(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // ===============================================================
+    // Domain Validators (Used in BOTH create and update)
+    // ===============================================================
+
+    function isValidUserProfile(data, uid) {
+      return data.keys().size() <= 40 &&
+        !data.keys().hasAny(['role', 'isAdmin', 'admin']) &&
+        (!('uid' in data) || data.uid == uid) &&
+        isOptionalString(data, 'displayName', 1, 80) &&
+        isOptionalString(data, 'email', 3, 150) &&
+        (!('sex' in data) || data.sex in ['male', 'female']) &&
+        isOptionalNumberRange(data, 'age', 13, 120) &&
+        isOptionalNumberRange(data, 'weightKg', 25, 350) &&
+        isOptionalNumberRange(data, 'heightCm', 100, 250) &&
+        isOptionalString(data, 'goal', 1, 80) &&
+        isOptionalString(data, 'experienceLevel', 1, 40) &&
+        isOptionalNumberRange(data, 'daysPerWeek', 1, 7) &&
+        isOptionalNumberRange(data, 'sessionMinutes', 10, 240) &&
+        isOptionalList(data, 'injuries', 10) &&
+        isOptionalList(data, 'priorityMuscles', 4) &&
+        (!('equipment' in data) ||
+          (data.equipment is string && data.equipment.size() <= 80) ||
+          (data.equipment is list && data.equipment.size() <= 30)) &&
+        isOptionalList(data, 'groupIds', 20) &&
+        (!('onboardingCompleted' in data) || data.onboardingCompleted is bool) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidRoutine(data) {
+      return data.keys().size() <= 25 &&
+        isOptionalString(data, 'name', 1, 100) &&
+        isOptionalString(data, 'goal', 1, 80) &&
+        isOptionalNumberRange(data, 'daysPerWeek', 1, 7) &&
+        isOptionalList(data, 'days', 7) &&
+        isOptionalList(data, 'exercises', 60) &&
+        (!('isActive' in data) || data.isActive is bool) &&
+        isOptionalNullableString(data, 'notes', 0, 1000) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidWorkout(data) {
+      return data.keys().size() <= 30 &&
+        isOptionalNullableString(data, 'routineId', 1, 100) &&
+        isOptionalString(data, 'name', 1, 120) &&
+        isOptionalList(data, 'exercises', 50) &&
+        isOptionalNumberRange(data, 'durationMinutes', 0, 600) &&
+        isOptionalNumberRange(data, 'durationSeconds', 0, 36000) &&
+        isOptionalNumberRange(data, 'totalVolumeKg', 0, 500000) &&
+        isOptionalNullableString(data, 'notes', 0, 1000) &&
+        (!('status' in data) || data.status in ['in_progress', 'completed', 'cancelled']) &&
+        isOptionalTimestamp(data, 'startedAt') &&
+        isOptionalNullableTimestamp(data, 'completedAt') &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidBodyMetric(data) {
+      return data.keys().size() <= 20 &&
+        isOptionalNullableNumberRange(data, 'weightKg', 25, 350) &&
+        isOptionalNullableNumberRange(data, 'bodyFatPct', 2, 70) &&
+        isOptionalNullableNumberRange(data, 'waistCm', 30, 250) &&
+        isOptionalNullableNumberRange(data, 'hipCm', 40, 250) &&
+        isOptionalNullableNumberRange(data, 'chestCm', 40, 250) &&
+        isOptionalNullableNumberRange(data, 'armCm', 15, 100) &&
+        isOptionalNullableNumberRange(data, 'thighCm', 25, 150) &&
+        isOptionalNullableNumberRange(data, 'neckCm', 20, 80) &&
+        isOptionalNullableString(data, 'notes', 0, 500) &&
+        (!('date' in data) || data.date is timestamp || (data.date is string && data.date.size() <= 30)) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidProgressPhoto(data, uid) {
+      return data.keys().size() <= 15 &&
+        (!('storagePath' in data) || isScopedPath(data.storagePath, uid)) &&
+        (!('downloadUrl' in data) || isValidUrl(data.downloadUrl)) &&
+        (!('photoUrl' in data) || isValidUrl(data.photoUrl)) &&
+        (!('pose' in data) || data.pose in ['front', 'side', 'back', 'other']) &&
+        isOptionalNullableString(data, 'notes', 0, 500) &&
+        isOptionalNullableNumberRange(data, 'weightKg', 25, 350) &&
+        isOptionalTimestamp(data, 'takenAt') &&
+        isOptionalTimestamp(data, 'createdAt');
+    }
+
+    function isValidGroup(data) {
+      return data.keys().hasOnly([
+          'name',
+          'description',
+          'adminUid',
+          'inviteCode',
+          'memberCount',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll(['name', 'adminUid', 'inviteCode']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 60 &&
+        isOptionalNullableString(data, 'description', 0, 300) &&
+        data.adminUid is string && data.adminUid.size() >= 1 && data.adminUid.size() <= 128 &&
+        data.inviteCode is string && data.inviteCode.size() == 6 &&
+        isOptionalNumberRange(data, 'memberCount', 1, 500) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    // Strict allowlist: explicitly blocks private body metrics & progressPhotos in group members
+    function isValidGroupMember(data, memberUid) {
+      return data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'role',
+          'joinedAt',
+          'currentStreak',
+          'weeklyPlannedSessions',
+          'weeklyCompletedSessions',
+          'monthlyCompliancePct',
+          'lastWorkoutAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll(['displayName', 'role']) &&
+        (!('uid' in data) || data.uid == memberUid) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.role in ['admin', 'member'] &&
+        isOptionalTimestamp(data, 'joinedAt') &&
+        isOptionalNumberRange(data, 'currentStreak', 0, 10000) &&
+        isOptionalNumberRange(data, 'weeklyPlannedSessions', 0, 14) &&
+        isOptionalNumberRange(data, 'weeklyCompletedSessions', 0, 21) &&
+        isOptionalNumberRange(data, 'monthlyCompliancePct', 0, 100) &&
+        isOptionalNullableTimestamp(data, 'lastWorkoutAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidFeedPost(data) {
+      return data.keys().hasOnly([
+          'authorUid',
+          'authorName',
+          'type',
+          'title',
+          'workoutTitle',
+          'summary',
+          'note',
+          'durationMinutes',
+          'totalSets',
+          'streakCount',
+          'reactions',
+          'commentCount',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll(['authorUid', 'authorName']) &&
+        data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        (!('type' in data) || data.type in ['workout', 'pr', 'milestone', 'challenge', 'note']) &&
+        isOptionalString(data, 'title', 1, 120) &&
+        isOptionalString(data, 'workoutTitle', 1, 120) &&
+        isOptionalNullableString(data, 'summary', 0, 300) &&
+        isOptionalNullableString(data, 'note', 0, 1000) &&
+        isOptionalNumberRange(data, 'durationMinutes', 0, 600) &&
+        isOptionalNumberRange(data, 'totalSets', 0, 500) &&
+        isOptionalNumberRange(data, 'streakCount', 0, 10000) &&
+        (!('reactions' in data) || (data.reactions is map && data.reactions.size() <= 20)) &&
+        isOptionalNumberRange(data, 'commentCount', 0, 100000) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidFeedComment(data) {
+      return data.keys().hasOnly(['authorUid', 'authorName', 'text', 'createdAt']) &&
+        data.keys().hasAll(['authorUid', 'text']) &&
+        data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 &&
+        isOptionalString(data, 'authorName', 1, 80) &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 500 &&
+        isOptionalTimestamp(data, 'createdAt');
+    }
+
+    function isValidChallengeProgressValue(val) {
+      return (val is number && val >= 0 && val <= 1000000) ||
+        (val is map && val.keys().size() <= 5);
+    }
+
+    function isValidChallenge(data) {
+      return data.keys().hasOnly([
+          'title',
+          'description',
+          'metricType',
+          'targetValue',
+          'startDate',
+          'endDate',
+          'status',
+          'createdBy',
+          'progressByUid',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasAll(['title', 'targetValue']) &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 100 &&
+        isOptionalNullableString(data, 'description', 0, 500) &&
+        isOptionalString(data, 'metricType', 1, 40) &&
+        data.targetValue is number && data.targetValue > 0 && data.targetValue <= 1000000 &&
+        isOptionalTimestamp(data, 'startDate') &&
+        isOptionalTimestamp(data, 'endDate') &&
+        (!('status' in data) || data.status in ['upcoming', 'active', 'completed', 'cancelled']) &&
+        isOptionalString(data, 'createdBy', 1, 128) &&
+        (!('progressByUid' in data) || (data.progressByUid is map && data.progressByUid.size() <= 200)) &&
+        isOptionalTimestamp(data, 'createdAt') &&
+        isOptionalTimestamp(data, 'updatedAt');
+    }
+
+    function isValidInviteCode(data, code) {
+      return code.size() == 6 &&
+        data.keys().hasOnly(['groupId', 'groupName', 'adminUid', 'createdAt']) &&
+        data.keys().hasAll(['groupId']) &&
+        data.groupId is string && data.groupId.size() >= 1 && data.groupId.size() <= 128 &&
+        isOptionalString(data, 'groupName', 2, 60) &&
+        isOptionalString(data, 'adminUid', 1, 128) &&
+        isOptionalTimestamp(data, 'createdAt');
+    }
+
+    // ===============================================================
+    // 1. Users & Private Subcollections
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) &&
+        uidUnchanged(uid) &&
+        isValidUserProfile(request.resource.data, uid);
+      allow update: if isOwner(uid) &&
+        uidNotModified() &&
+        immutableCreatedAt() &&
+        isValidUserProfile(request.resource.data, uid);
+      allow delete: if isOwner(uid);
+
+      // 2a. User Routines (strictly private to owner)
+      match /routines/{routineId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidRoutine(request.resource.data);
+        allow update: if isOwner(uid) && immutableCreatedAt() && isValidRoutine(request.resource.data);
+        allow delete: if isOwner(uid);
+      }
+
+      // 2b. User Workouts (strictly private to owner)
+      match /workouts/{workoutId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidWorkout(request.resource.data);
+        allow update: if isOwner(uid) && immutableCreatedAt() && isValidWorkout(request.resource.data);
+        allow delete: if isOwner(uid);
+      }
+
+      // 2c. User Body Metrics (NEVER accessible by other users, group members, or group admins)
+      match /bodyMetrics/{metricId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidBodyMetric(request.resource.data);
+        allow update: if isOwner(uid) && immutableCreatedAt() && isValidBodyMetric(request.resource.data);
+        allow delete: if isOwner(uid);
+      }
+
+      // 2d. User Progress Photos (NEVER accessible by other users, group members, or group admins)
+      match /progressPhotos/{photoId} {
+        allow read: if isOwner(uid);
+        allow create: if isOwner(uid) && isValidProgressPhoto(request.resource.data, uid);
+        allow update: if isOwner(uid) && immutableCreatedAt() && isValidProgressPhoto(request.resource.data, uid);
+        allow delete: if isOwner(uid);
+      }
+    }
+
+    // ===============================================================
+    // 3. Groups & Group Subcollections
+    // ===============================================================
+
+    match /groups/{groupId} {
+      allow read: if isAuthenticated() && (
+        isGroupMember(groupId) ||
+        (resource != null && resource.data.adminUid == request.auth.uid)
+      );
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.adminUid == request.auth.uid &&
+        isValidGroup(request.resource.data);
+
+      allow update: if isAuthenticated() &&
+        resource.data.adminUid == request.auth.uid &&
+        immutableCreatedAt() &&
+        isValidGroup(request.resource.data) &&
+        (
+          request.resource.data.adminUid == resource.data.adminUid ||
+          exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.resource.data.adminUid))
+        );
+
+      allow delete: if isAuthenticated() && resource.data.adminUid == request.auth.uid;
+
+      // -------------------------------------------------------------
+      // 4. Group Members (Consistency stats only; zero private metrics)
+      // -------------------------------------------------------------
+      match /members/{memberUid} {
+        allow read: if isGroupMember(groupId);
+
+        allow create: if isOwner(memberUid) &&
+          existsAfter(/databases/$(database)/documents/groups/$(groupId)) &&
+          isValidGroupMember(request.resource.data, memberUid) &&
+          (
+            (getAfter(/databases/$(database)/documents/groups/$(groupId)).data.adminUid == memberUid &&
+              request.resource.data.role == 'admin') ||
+            (getAfter(/databases/$(database)/documents/groups/$(groupId)).data.adminUid != memberUid &&
+              request.resource.data.role == 'member')
+          );
+
+        allow update: if isValidGroupMember(request.resource.data, memberUid) &&
+          uidNotModified() &&
+          (!('joinedAt' in resource.data) || request.resource.data.joinedAt == resource.data.joinedAt) &&
+          (
+            // Self-update: consistency stats & displayName only; cannot change role
+            (
+              isOwner(memberUid) &&
+              request.resource.data.role == resource.data.role &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'displayName',
+                'currentStreak',
+                'weeklyPlannedSessions',
+                'weeklyCompletedSessions',
+                'monthlyCompliancePct',
+                'lastWorkoutAt',
+                'updatedAt'
+              ])
+            ) ||
+            // Group admin: can update member role (cannot demote primary group adminUid unless owner)
+            (
+              isGroupAdmin(groupId) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'updatedAt']) &&
+              (
+                memberUid != get(/databases/$(database)/documents/groups/$(groupId)).data.adminUid ||
+                isGroupOwner(groupId)
+              )
+            )
+          );
+
+        allow delete: if isOwner(memberUid) || (
+          isGroupAdmin(groupId) &&
+          memberUid != get(/databases/$(database)/documents/groups/$(groupId)).data.adminUid
+        );
+      }
+
+      // -------------------------------------------------------------
+      // 5. Group Feed Posts
+      // -------------------------------------------------------------
+      match /feed/{postId} {
+        allow read: if isGroupMember(groupId);
+
+        allow create: if isGroupMember(groupId) &&
+          request.resource.data.authorUid == request.auth.uid &&
+          (!('commentCount' in request.resource.data) || request.resource.data.commentCount == 0) &&
+          isValidFeedPost(request.resource.data);
+
+        allow update: if isGroupMember(groupId) &&
+          request.resource.data.authorUid == resource.data.authorUid &&
+          immutableCreatedAt() &&
+          isValidFeedPost(request.resource.data) &&
+          (
+            // Author can edit note
+            (
+              resource.data.authorUid == request.auth.uid &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['note', 'updatedAt'])
+            ) ||
+            // Any group member can update ONLY reactions and/or commentCount (+/- 1)
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions', 'commentCount']) &&
+              (
+                !('commentCount' in request.resource.data.diff(resource.data).affectedKeys()) ||
+                ('commentCount' in resource.data &&
+                  math.abs(request.resource.data.commentCount - resource.data.commentCount) == 1) ||
+                (!('commentCount' in resource.data) && request.resource.data.commentCount == 1)
+              )
+            )
+          );
+
+        allow delete: if (isGroupMember(groupId) && resource.data.authorUid == request.auth.uid) ||
+          isGroupAdmin(groupId);
+
+        // -----------------------------------------------------------
+        // 6. Group Feed Comments
+        // -----------------------------------------------------------
+        match /comments/{commentId} {
+          allow read: if isGroupMember(groupId);
+
+          allow create: if isGroupMember(groupId) &&
+            exists(/databases/$(database)/documents/groups/$(groupId)/feed/$(postId)) &&
+            request.resource.data.authorUid == request.auth.uid &&
+            isValidFeedComment(request.resource.data);
+
+          allow update: if false;
+
+          allow delete: if (isGroupMember(groupId) && resource.data.authorUid == request.auth.uid) ||
+            isGroupAdmin(groupId);
+        }
+      }
+
+      // -------------------------------------------------------------
+      // 7. Group Challenges
+      // -------------------------------------------------------------
+      match /challenges/{challengeId} {
+        allow read: if isGroupMember(groupId);
+
+        allow create: if isGroupAdmin(groupId) &&
+          (!('createdBy' in request.resource.data) || request.resource.data.createdBy == request.auth.uid) &&
+          isValidChallenge(request.resource.data);
+
+        allow update: if isValidChallenge(request.resource.data) &&
+          immutableCreatedAt() &&
+          (!('createdBy' in resource.data) || request.resource.data.createdBy == resource.data.createdBy) &&
+          (
+            // Admin can edit all challenge fields
+            isGroupAdmin(groupId) ||
+            // Group member can ONLY update their own UID entry inside progressByUid
+            (
+              isGroupMember(groupId) &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['progressByUid']) &&
+              'progressByUid' in request.resource.data &&
+              request.resource.data.progressByUid is map &&
+              (
+                (
+                  'progressByUid' in resource.data &&
+                  resource.data.progressByUid is map &&
+                  request.resource.data.progressByUid.diff(resource.data.progressByUid).affectedKeys().hasOnly([request.auth.uid])
+                ) ||
+                (
+                  !('progressByUid' in resource.data) &&
+                  request.resource.data.progressByUid.keys().hasOnly([request.auth.uid])
+                )
+              ) &&
+              (
+                !(request.auth.uid in request.resource.data.progressByUid) ||
+                isValidChallengeProgressValue(request.resource.data.progressByUid[request.auth.uid])
+              )
+            )
+          );
+
+        allow delete: if isGroupAdmin(groupId);
+      }
+    }
+
+    // ===============================================================
+    // 8. Invite Codes (Exact-match lookup only; list denied)
+    // ===============================================================
+
+    match /inviteCodes/{code} {
+      allow get: if isAuthenticated();
+      allow list: if false;
+
+      allow create: if isAuthenticated() &&
+        isValidInviteCode(request.resource.data, code) &&
+        (!('adminUid' in request.resource.data) || request.resource.data.adminUid == request.auth.uid) &&
+        existsAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)) &&
+        getAfter(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.adminUid == request.auth.uid;
+
+      allow update: if isAuthenticated() &&
+        isValidInviteCode(request.resource.data, code) &&
+        request.resource.data.groupId == resource.data.groupId &&
+        immutableCreatedAt() &&
+        exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
+        get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminUid == request.auth.uid;
+
+      allow delete: if isAuthenticated() &&
+        exists(/databases/$(database)/documents/groups/$(resource.data.groupId)) &&
+        get(/databases/$(database)/documents/groups/$(resource.data.groupId)).data.adminUid == request.auth.uid;
+    }
+
+    // ===============================================================
+    // 9. Global Exercise Catalog (Read-only for authenticated users)
+    // ===============================================================
+
+    match /exercises/{exerciseId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // ===============================================================
+    // 10. Default Deny-All
+    // ===============================================================
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
