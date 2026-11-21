@@ -9,6 +9,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import {
+  Timestamp,
   doc,
   getDoc,
   setDoc,
@@ -17,6 +18,26 @@ import {
   getDocs,
   writeBatch,
 } from 'firebase/firestore';
+
+const AUTH_TS_FIELDS = ['createdAt', 'updatedAt', 'joinedAt', 'lastWorkoutAt'] as const;
+
+function toFsTimestamps<T extends object>(obj: T): Record<string, unknown> {
+  const out: Record<string, unknown> = JSON.parse(JSON.stringify(obj));
+  for (const f of AUTH_TS_FIELDS) {
+    const v = out[f];
+    if (typeof v === 'string') out[f] = Timestamp.fromDate(new Date(v));
+  }
+  return out;
+}
+
+function fromFsTimestamps<T>(data: Record<string, unknown>): T {
+  const out = { ...data };
+  for (const f of AUTH_TS_FIELDS) {
+    const v = out[f];
+    if (v instanceof Timestamp) out[f] = v.toDate().toISOString();
+  }
+  return out as T;
+}
 import { getFirebaseServices } from './client';
 import { generateInviteCode, normalizeInviteCode } from '@/lib/utils/invite-code';
 import type { GroupInfo, GroupMember, UserProfile } from '@/types/user';
@@ -197,7 +218,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const services = getFirebaseServices();
   if (services) {
     const snap = await getDoc(doc(services.db, 'users', uid));
-    return snap.exists() ? (snap.data() as UserProfile) : null;
+    return snap.exists() ? fromFsTimestamps<UserProfile>(snap.data()) : null;
   }
   const profiles = readJSON<Record<string, UserProfile>>(LOCAL_KEYS.profiles, {});
   return profiles[uid] ?? null;
@@ -206,7 +227,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
 export async function saveUserProfile(profile: UserProfile): Promise<void> {
   const services = getFirebaseServices();
   if (services) {
-    await setDoc(doc(services.db, 'users', profile.uid), profile, { merge: true });
+    await setDoc(doc(services.db, 'users', profile.uid), toFsTimestamps(profile), { merge: true });
     return;
   }
   const profiles = readJSON<Record<string, UserProfile>>(LOCAL_KEYS.profiles, {});
@@ -247,17 +268,19 @@ export async function createGroup(
 
   const services = getFirebaseServices();
   if (services) {
+    const nowTs = Timestamp.fromDate(new Date(now));
     const batch = writeBatch(services.db);
-    batch.set(doc(services.db, 'groups', groupId), group);
-    batch.set(doc(services.db, 'groups', groupId, 'members', user.uid), member);
+    batch.set(doc(services.db, 'groups', groupId), toFsTimestamps(group));
+    batch.set(doc(services.db, 'groups', groupId, 'members', user.uid), toFsTimestamps(member));
     batch.set(doc(services.db, 'inviteCodes', inviteCode), {
       groupId,
       groupName: cleanName,
-      active: true,
+      adminUid: user.uid,
+      createdAt: nowTs,
     });
     batch.set(
       doc(services.db, 'users', user.uid),
-      { groupId, updatedAt: now },
+      { groupId, updatedAt: nowTs },
       { merge: true }
     );
     await batch.commit();
@@ -306,14 +329,17 @@ export async function joinGroupByCode(
   const services = getFirebaseServices();
   if (services) {
     const codeSnap = await getDoc(doc(services.db, 'inviteCodes', code));
-    if (!codeSnap.exists() || !codeSnap.data().active) {
+    if (!codeSnap.exists()) {
       throw new Error('Código de invitación inválido o inactivo.');
     }
     const { groupId } = codeSnap.data() as { groupId: string };
-    await setDoc(doc(services.db, 'groups', groupId, 'members', user.uid), member);
-    await updateDoc(doc(services.db, 'users', user.uid), { groupId, updatedAt: now });
+    await setDoc(doc(services.db, 'groups', groupId, 'members', user.uid), toFsTimestamps(member));
+    await updateDoc(doc(services.db, 'users', user.uid), {
+      groupId,
+      updatedAt: Timestamp.fromDate(new Date(now)),
+    });
     const groupSnap = await getDoc(doc(services.db, 'groups', groupId));
-    return groupSnap.data() as GroupInfo;
+    return fromFsTimestamps<GroupInfo>(groupSnap.data() as Record<string, unknown>);
   }
 
   const groups = readJSON<Record<string, GroupInfo>>(LOCAL_KEYS.groups, {});
@@ -346,8 +372,8 @@ export async function getGroupAndMembers(
     const groupSnap = await getDoc(doc(services.db, 'groups', groupId));
     if (!groupSnap.exists()) return { group: null, members: [] };
     const membersSnap = await getDocs(collection(services.db, 'groups', groupId, 'members'));
-    const members = membersSnap.docs.map((d) => d.data() as GroupMember);
-    return { group: groupSnap.data() as GroupInfo, members };
+    const members = membersSnap.docs.map((d) => fromFsTimestamps<GroupMember>(d.data()));
+    return { group: fromFsTimestamps<GroupInfo>(groupSnap.data()), members };
   }
 
   const groups = readJSON<Record<string, GroupInfo>>(LOCAL_KEYS.groups, {});
