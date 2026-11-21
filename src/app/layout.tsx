@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { TrainingProvider } from '@/components/providers/TrainingProvider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -62,7 +63,9 @@ export default function RootLayout({
       </head>
       <body className="antialiased selection:bg-[var(--accent)] selection:text-white">
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <TrainingProvider>{children}</TrainingProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

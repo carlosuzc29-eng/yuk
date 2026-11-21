@@ -11,6 +11,7 @@ import {
   Users,
   User,
   WifiOff,
+  ArrowLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -27,11 +28,14 @@ export function AppShell({
   title,
   subtitle,
   rightSlot,
+  backHref,
   children,
 }: {
   title: string;
   subtitle?: string;
   rightSlot?: React.ReactNode;
+  /** Muestra un enlace "Volver" encima del título. */
+  backHref?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -53,6 +57,14 @@ export function AppShell({
       <header className="sticky top-0 z-30 backdrop-blur-xl bg-[var(--bg)]/85 border-b border-[var(--border)] px-5 pt-5 pb-4">
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
+            {backHref && (
+              <Link
+                href={backHref}
+                className="inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--text)] mb-2"
+              >
+                <ArrowLeft className="h-4 w-4" /> Volver
+              </Link>
+            )}
             <h1 className="font-display text-[32px] leading-none tracking-[-0.03em] text-[var(--text)]">
               {title}
             </h1>

@@ -58,7 +58,7 @@ function pair(leftPath: string): [string, string] {
 }
 
 /** Silueta anatómica realista con proporciones de 7.5 cabezas (viewBox 0 0 280 540) */
-function getBodySilhouette(sex: Sex) {
+export function getBodySilhouette(sex: Sex) {
   const f = sex === 'female';
   // Ajustes anatómicos diferenciados hombre vs mujer
   const shX = f ? 76 : 64; // ancho de hombros (lado izquierdo)
@@ -128,7 +128,7 @@ function getBodySilhouette(sex: Sex) {
   };
 }
 
-function getFrontZones(sex: Sex): MuscleZone[] {
+export function getFrontZones(sex: Sex): MuscleZone[] {
   const f = sex === 'female';
   const s = f ? 10 : 0; // desplazamiento de hombro hacia adentro en mujer
   const w = f ? 5 : 0; // cintura más estrecha en mujer
@@ -215,7 +215,7 @@ function getFrontZones(sex: Sex): MuscleZone[] {
   ];
 }
 
-function getBackZones(sex: Sex): MuscleZone[] {
+export function getBackZones(sex: Sex): MuscleZone[] {
   const f = sex === 'female';
   const s = f ? 10 : 0;
   const w = f ? 5 : 0;

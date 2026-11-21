@@ -92,6 +92,50 @@
     --success: light-dark(var(--yuk-success-light), var(--yuk-success-dark));
   }
 
+  /* Maniquí de las demostraciones animadas */
+  --fig: #d9dad9;
+  --fig-far: #c4c5c4;
+  --fig-line: #a2a3a2;
+  --fig-prop: #292b2a;
+  --fig-plate: #3c3e3d;
+  --fig-scene: #e9eae9;
+  --fig-band: #7a7b7b;
+
+  @media (prefers-color-scheme: dark) {
+    --fig: #4b4d4c;
+    --fig-far: #3a3c3b;
+    --fig-line: #6a6c6b;
+    --fig-prop: #d4d5d4;
+    --fig-plate: #8a8c8b;
+    --fig-scene: #2c2e2d;
+    --fig-band: #a2a3a2;
+  }
+
+  @supports (color: light-dark(white, black)) {
+    --fig: light-dark(#d9dad9, #4b4d4c);
+    --fig-far: light-dark(#c4c5c4, #3a3c3b);
+    --fig-line: light-dark(#a2a3a2, #6a6c6b);
+    --fig-prop: light-dark(#292b2a, #d4d5d4);
+    --fig-plate: light-dark(#3c3e3d, #8a8c8b);
+    --fig-scene: light-dark(#e9eae9, #2c2e2d);
+    --fig-band: light-dark(#7a7b7b, #a2a3a2);
+  }
+
+  /* Gráficos (validado: claro #ff6105, oscuro #f05a08 en banda L 0.48–0.67) */
+  --chart-1: #ff6105;
+  --chart-track: #ffdfcd;
+  --chart-grid: #ececec;
+  @media (prefers-color-scheme: dark) {
+    --chart-1: #f05a08;
+    --chart-track: #3a2a20;
+    --chart-grid: #2a2c2b;
+  }
+  @supports (color: light-dark(white, black)) {
+    --chart-1: light-dark(#ff6105, #f05a08);
+    --chart-track: light-dark(#ffdfcd, #3a2a20);
+    --chart-grid: light-dark(#ececec, #2a2c2b);
+  }
+
   /* Firma de marca: brillo naranja solo en el CTA principal */
   --shadow-cta: rgba(255, 97, 5, 0.45) 1px 6px 14px 0px, rgba(0, 0, 0, 0.06) 0px 1px 4px 0px;
 
@@ -123,6 +167,7 @@ body {
   min-height: 100dvh;
 }
 
+@layer components {
 /* ---------- Tipografía editorial ---------- */
 /* Titulares: peso Light 300, el tracking se cierra a medida que crece */
 .font-display {
@@ -228,6 +273,7 @@ body {
   color: var(--success);
   border-color: color-mix(in srgb, var(--success) 35%, transparent);
   background: color-mix(in srgb, var(--success) 8%, transparent);
+}
 }
 
 /* Foco accesible visible */
