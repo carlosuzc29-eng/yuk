@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { buildPose3D } from '@/lib/exercises/kinematics3d';
 import {
   alternativesFor,
   allowedEquipmentFor,
@@ -160,6 +161,36 @@ describe('generador de rutinas', () => {
     expect(r.days[1].name).toMatch(/Torso|Empuje|Tirón/i);
     expect(r.days[2].name).toMatch(/Pierna/i);
     expect(r.days[3].name).toMatch(/Pierna/i);
+  });
+
+  it('genera poses 3D válidas y sin NaN para todos los ejercicios en silueta masculina y femenina', () => {
+    for (const ex of EXERCISES) {
+      for (const sex of ['male', 'female'] as const) {
+        for (const t of [0, 0.5, 1]) {
+          const { pose } = buildPose3D(ex, t, sex);
+          const pts = [
+            pose.pelvis,
+            pose.chest,
+            pose.head,
+            pose.shoulderL,
+            pose.shoulderR,
+            pose.elbowL,
+            pose.elbowR,
+            pose.wristL,
+            pose.wristR,
+            pose.kneeL,
+            pose.kneeR,
+            pose.ankleL,
+            pose.ankleR,
+          ];
+          for (const p of pts) {
+            expect(Number.isFinite(p.x), `${ex.id} ${sex} x`).toBe(true);
+            expect(Number.isFinite(p.y), `${ex.id} ${sex} y`).toBe(true);
+            expect(Number.isFinite(p.z), `${ex.id} ${sex} z`).toBe(true);
+          }
+        }
+      }
+    }
   });
 });
 

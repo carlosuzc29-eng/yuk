@@ -5,6 +5,7 @@ import { Pause, Play } from 'lucide-react';
 import type { Exercise } from '@/types/training';
 import type { MuscleId, Sex } from '@/types/user';
 import { useAuth } from '@/components/providers/AuthProvider';
+import { Exercise3DViewer } from './Exercise3DViewer';
 import { PATTERNS, type Pad, type PatternDef } from '@/lib/exercises/poses';
 import {
   add,
@@ -170,6 +171,46 @@ export function ExerciseAnimation({
 }: Props) {
   const { profile } = useAuth();
   const sex: Sex = sexProp ?? profile?.sex ?? 'male';
+  const [webglFailed, setWebglFailed] = useState(false);
+
+  // En vistas interactivas (detalle, modo entrenamiento) usamos el motor 3D realista con máquinas y cámara 360°.
+  // En miniaturas (`fill` o `animate={false}`) usamos el SVG anatómico ultrarrápido para no saturar contextos WebGL.
+  const use3D = showControls && animate && !fill && !webglFailed && !exercise.videoUrl;
+  if (use3D) {
+    return (
+      <Exercise3DViewer
+        exercise={exercise}
+        sex={sex}
+        animate={animate}
+        showControls={showControls}
+        className={className}
+        onWebGLFailed={() => setWebglFailed(true)}
+      />
+    );
+  }
+
+  return (
+    <ExerciseAnimation2D
+      exercise={exercise}
+      sex={sex}
+      animate={animate}
+      staticT={staticT}
+      showControls={showControls}
+      className={className}
+      fill={fill}
+    />
+  );
+}
+
+function ExerciseAnimation2D({
+  exercise,
+  sex,
+  animate = true,
+  staticT = 0.85,
+  showControls = true,
+  className,
+  fill = false,
+}: Omit<Props, 'sex'> & { sex: Sex }) {
 
   const def = PATTERNS[exercise.pattern];
   const reduced = usePrefersReducedMotion();
