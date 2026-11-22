@@ -1,5 +1,36 @@
 export type Sex = 'male' | 'female';
 
+export type DayFocus = 'pierna' | 'superior' | 'completo';
+
+export const DAY_FOCUS_LABELS: Record<DayFocus, { label: string; short: string }> = {
+  pierna: { label: 'Pierna y glúteo', short: 'Pierna' },
+  superior: { label: 'Tren superior', short: 'Superior' },
+  completo: { label: 'Cuerpo completo', short: 'Completo' },
+};
+
+/** Distribución recomendada por defecto según sexo y días (totalmente editable por el usuario). */
+export function defaultDayFocusPlan(daysPerWeek: number, sex: Sex): DayFocus[] {
+  const n = Math.min(6, Math.max(2, daysPerWeek));
+  if (sex === 'female') {
+    const map: Record<number, DayFocus[]> = {
+      2: ['pierna', 'superior'],
+      3: ['pierna', 'superior', 'pierna'],
+      4: ['pierna', 'superior', 'pierna', 'pierna'],
+      5: ['pierna', 'superior', 'pierna', 'superior', 'pierna'],
+      6: ['pierna', 'superior', 'pierna', 'superior', 'pierna', 'pierna'],
+    };
+    return [...map[n]];
+  }
+  const map: Record<number, DayFocus[]> = {
+    2: ['superior', 'pierna'],
+    3: ['superior', 'pierna', 'superior'],
+    4: ['superior', 'pierna', 'superior', 'pierna'],
+    5: ['superior', 'pierna', 'superior', 'superior', 'pierna'],
+    6: ['superior', 'pierna', 'superior', 'pierna', 'superior', 'superior'],
+  };
+  return [...map[n]];
+}
+
 export type ExperienceLevel = 'principiante' | 'intermedio' | 'avanzado';
 
 export type EquipmentType =
@@ -79,6 +110,7 @@ export interface UserProfile {
   bodyFatPct?: number | null;
   experience: ExperienceLevel;
   daysPerWeek: number; // 2-6
+  dayFocusPlan?: DayFocus[];
   sessionMinutes: 30 | 45 | 60 | 75 | 90;
   equipment: EquipmentType[];
   injuries: InjuryType[];

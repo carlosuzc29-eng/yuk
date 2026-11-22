@@ -32,8 +32,17 @@ import {
   weeklySetsByMuscle,
 } from '@/lib/training/generator';
 import { createWorkoutFromDay } from '@/lib/training/session';
+import { DayFocusPicker } from '@/components/onboarding/DayFocusPicker';
+import { saveUserProfile } from '@/lib/firebase/auth-service';
 import type { Exercise, ModalityPreference, Routine, RoutineDay, RoutineExercise } from '@/types/training';
-import { MUSCLE_LABELS, type InjuryType, type MuscleId } from '@/types/user';
+import {
+  MUSCLE_LABELS,
+  defaultDayFocusPlan,
+  type DayFocus,
+  type InjuryType,
+  type MuscleId,
+  type Sex,
+} from '@/types/user';
 
 type SheetState =
   | { kind: 'none' }
@@ -48,8 +57,8 @@ const MUSCLE_ORDER = Object.keys(MUSCLE_LABELS) as MuscleId[];
 
 export default function RutinaPage() {
   const router = useRouter();
-  const { user, profile, loading: authLoading } = useAuth();
-  const { routine, loading, saveRoutine, regenerate, startWorkout, active, workouts } = useTraining();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { routine, loading, saveRoutine, regenerate, routineOutdated, startWorkout, active, workouts } = useTraining();
   const [dayIdx, setDayIdx] = useState(0);
   const [sheet, setSheet] = useState<SheetState>({ kind: 'none' });
 
@@ -156,6 +165,24 @@ export default function RutinaPage() {
         <p className="text-sm text-[var(--text-muted)]">Preparando tu rutina…</p>
       ) : (
         <div className="space-y-6">
+          {routineOutdated && (
+            <div className="alert flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[var(--text-secondary)]">
+                Cambiaste tu perfil (días, tiempo, equipo o músculos prioritarios). Tu rutina tiene cambios
+                manuales, así que no la tocamos. ¿La actualizamos con tus nuevos datos?
+              </p>
+              <Button
+                variant="secondary"
+                className="shrink-0"
+                onClick={async () => {
+                  await regenerate(routine.modalityPreference ?? 'mixto');
+                  setDayIdx(0);
+                }}
+              >
+                Actualizar rutina
+              </Button>
+            </div>
+          )}
           {/* Selector de días */}
           <div role="tablist" aria-label="Días de la rutina" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1">
             {routine.days.map((d, i) => (
@@ -331,8 +358,22 @@ export default function RutinaPage() {
         {sheet.kind === 'regenerate' && (
           <RegenerateForm
             current={routine?.modalityPreference ?? 'mixto'}
-            onConfirm={async (m) => {
-              await regenerate(m);
+            daysPerWeek={profile.daysPerWeek}
+            sex={profile.sex}
+            initialPlan={
+              profile.dayFocusPlan && profile.dayFocusPlan.length === profile.daysPerWeek
+                ? profile.dayFocusPlan
+                : defaultDayFocusPlan(profile.daysPerWeek, profile.sex)
+            }
+            onConfirm={async (m, plan) => {
+              await saveUserProfile({
+                ...profile,
+                daysPerWeek: plan.length,
+                dayFocusPlan: plan,
+                updatedAt: new Date().toISOString(),
+              });
+              await refreshProfile();
+              await regenerate(m, plan);
               setDayIdx(0);
               close();
             }}
@@ -482,19 +523,27 @@ function CustomizeDay({
 
 function RegenerateForm({
   current,
+  daysPerWeek,
+  sex,
+  initialPlan,
   onConfirm,
 }: {
   current: ModalityPreference;
-  onConfirm: (m: ModalityPreference) => void;
+  daysPerWeek: number;
+  sex: Sex;
+  initialPlan: DayFocus[];
+  onConfirm: (m: ModalityPreference, plan: DayFocus[]) => void;
 }) {
   const [m, setM] = useState<ModalityPreference>(current);
+  const [plan, setPlan] = useState<DayFocus[]>(initialPlan);
   const [busy, setBusy] = useState(false);
   return (
     <div className="space-y-5">
       <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-        Creamos un plan nuevo con tus días, minutos, objetivo, lesiones y músculos prioritarios. Los cambios manuales
-        de la rutina actual se perderán (tu historial de entrenamientos se conserva).
+        Elige qué días quieres dedicar a pierna/glúteo y cuáles a tren superior. Los cambios manuales
+        de la rutina actual se reemplazarán (tu historial de entrenamientos se conserva).
       </p>
+      <DayFocusPicker daysPerWeek={daysPerWeek} sex={sex} value={plan} onChange={setPlan} />
       <div>
         <p className="eyebrow">Preferencia de equipo</p>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -514,7 +563,7 @@ function RegenerateForm({
         disabled={busy}
         onClick={async () => {
           setBusy(true);
-          await onConfirm(m);
+          await onConfirm(m, plan);
           setBusy(false);
         }}
       >

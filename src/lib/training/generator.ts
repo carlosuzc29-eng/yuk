@@ -9,12 +9,14 @@ import type {
   SplitType,
 } from '@/types/training';
 import type {
+  DayFocus,
   EquipmentType,
   ExperienceLevel,
   FitnessGoal,
   InjuryType,
   MuscleId,
   PriorityMuscle,
+  Sex,
   UserProfile,
 } from '@/types/user';
 import { EXERCISES, getExercise, modalityOf } from '@/lib/exercises/catalog';
@@ -22,7 +24,10 @@ import { EXERCISES, getExercise, modalityOf } from '@/lib/exercises/catalog';
 export type GeneratorProfile = Pick<
   UserProfile,
   'daysPerWeek' | 'sessionMinutes' | 'experience' | 'goal' | 'equipment' | 'injuries' | 'priorityMuscles'
->;
+> & {
+  dayFocusPlan?: DayFocus[];
+  sex?: Sex;
+};
 
 interface Slot {
   muscle: MuscleId;
@@ -65,6 +70,10 @@ const T: Record<string, Template> = {
   piernaB: {
     name: 'Pierna B',
     slots: [C('gluteo_mayor'), C('cuadriceps'), I('isquiotibiales'), I('cuadriceps'), I('aductores'), I('pantorrillas'), I('oblicuos'), I('gluteo_medio')],
+  },
+  piernaC: {
+    name: 'Pierna y glúteo C',
+    slots: [C('isquiotibiales'), C('gluteo_mayor'), C('cuadriceps'), I('gluteo_medio'), I('aductores'), I('pantorrillas'), I('abdomen'), I('lumbares')],
   },
   empuje: {
     name: 'Empuje',
@@ -136,6 +145,8 @@ export interface PickContext {
   experience: ExperienceLevel;
   modality: ModalityPreference;
   usedInDay: Set<string>;
+  /** Patrones de movimiento ya usados hoy (evita dos variantes del mismo gesto). */
+  patternsInDay?: Set<string>;
   usedInWeek: Map<string, number>;
   variant: number;
 }
@@ -153,7 +164,14 @@ function scoreExercise(x: Exercise, slot: Slot, ctx: PickContext): number {
   // Para principiantes, máquinas y poleas dan estabilidad mientras se aprende la técnica.
   if (ctx.experience === 'principiante' && (x.equipment === 'maquina' || x.equipment === 'polea')) s += 2;
   if (x.timed && slot.kind === 'compuesto') s -= 3;
+  // Con gimnasio y sin preferencia, preferimos ejercicios con carga progresiva.
+  if (ctx.modality === 'mixto' && ctx.allowed.includes('maquina')) {
+    if (x.equipment === 'banda') s -= 3;
+    else if (x.equipment === 'peso_corporal' && regionOf(slot.muscle) !== 'core') s -= 1;
+    else if (x.mechanics === 'compuesto' && (x.equipment === 'barra' || x.equipment === 'mancuernas' || x.equipment === 'maquina')) s += 1;
+  }
   s -= (ctx.usedInWeek.get(x.id) ?? 0) * 3;
+  if (ctx.patternsInDay?.has(x.pattern)) s -= 5;
   return s;
 }
 
@@ -253,29 +271,48 @@ export function toRoutineExercise(
   return { uid: newUid(), exerciseId: ex.id, ...p, sets: p.sets + extraSets };
 }
 
-/** Ordena y amplía las ranuras del día según los músculos prioritarios. */
+/** Máximo de ejercicios extra que un día puede recibir por músculos prioritarios. */
+const MAX_PRIORITY_EXTRA = 2;
+
+/**
+ * La rutina siempre es completa: se conservan todas las ranuras de la plantilla
+ * (todos los grupos musculares del día). Los músculos prioritarios sólo añaden
+ * énfasis: van antes dentro de su tipo (compuesto / aislamiento), reciben series
+ * extra y, si el día no los trabaja, se añade como mucho un par de ejercicios.
+ */
 function applyPriorities(slots: Slot[], cap: number, priorities: PriorityMuscle[], dayMuscles: Set<MuscleId>): Slot[] {
-  let base = slots.slice(0, cap);
-  const relevant = priorities.filter((p) => {
-    if (dayMuscles.has(p.muscle)) return true;
-    const r = regionOf(p.muscle);
-    return r === 'core' ? false : [...dayMuscles].some((m) => regionOf(m) === r);
-  });
+  const base = slots.slice(0, cap);
+  const relevant = priorities
+    .filter((p) => {
+      if (dayMuscles.has(p.muscle)) return true;
+      const r = regionOf(p.muscle);
+      return r === 'core' ? false : [...dayMuscles].some((m) => regionOf(m) === r);
+    })
+    .sort((a, b) => b.level - a.level);
   if (!relevant.length) return base;
 
   const extra: Slot[] = [];
+  const count = (m: MuscleId) => [...base, ...extra].filter((s) => s.muscle === m).length;
   for (const p of relevant) {
-    const inBase = base.some((s) => s.muscle === p.muscle);
-    if (!inBase) extra.push(C(p.muscle));
-    if (p.level === 2) extra.push(I(p.muscle));
+    if (extra.length >= MAX_PRIORITY_EXTRA) break;
+    // Si el día no trabaja ese músculo (p. ej. pecho en día de tirón) se añade un aislamiento.
+    if (count(p.muscle) === 0) extra.push(dayMuscles.has(p.muscle) ? C(p.muscle) : I(p.muscle));
   }
-  // Los prioritarios van al inicio, cuando hay más energía.
-  const prioritySet = new Set(relevant.map((p) => p.muscle));
-  const first = base.filter((s) => prioritySet.has(s.muscle));
-  const rest = base.filter((s) => !prioritySet.has(s.muscle));
-  base = [...first, ...extra, ...rest];
-  // Permitimos hasta +2 ejercicios sobre el límite por tiempo.
-  return base.slice(0, cap + Math.min(2, extra.length));
+  for (const p of relevant) {
+    if (extra.length >= MAX_PRIORITY_EXTRA) break;
+    if (p.level === 2 && count(p.muscle) < 2) extra.push(I(p.muscle));
+  }
+
+  // Orden: compuestos prioritarios → resto de compuestos → aislamientos prioritarios → resto.
+  const prio = new Set(relevant.map((p) => p.muscle));
+  const all = [...base, ...extra];
+  const isC = (s: Slot) => s.kind === 'compuesto';
+  return [
+    ...all.filter((s) => isC(s) && prio.has(s.muscle)),
+    ...all.filter((s) => isC(s) && !prio.has(s.muscle)),
+    ...all.filter((s) => !isC(s) && prio.has(s.muscle)),
+    ...all.filter((s) => !isC(s) && !prio.has(s.muscle)),
+  ];
 }
 
 export interface BuildDayOptions {
@@ -303,41 +340,106 @@ export function buildDay(opts: BuildDayOptions): RoutineDay {
     experience: profile.experience,
     modality: opts.modality,
     usedInDay: new Set(),
+    patternsInDay: new Set(),
     usedInWeek: opts.usedInWeek,
     variant: opts.variant,
   };
 
-  const exercises: RoutineExercise[] = [];
+  const picked: Exercise[] = [];
   for (const slot of slots) {
     let ex = pickExercise(slot, ctx);
     if (!ex && slot.kind !== 'any') ex = pickExercise({ ...slot, kind: 'any' }, ctx);
     if (!ex) continue;
     ctx.usedInDay.add(ex.id);
+    ctx.patternsInDay!.add(ex.pattern);
     opts.usedInWeek.set(ex.id, (opts.usedInWeek.get(ex.id) ?? 0) + 1);
-    const pr = profile.priorityMuscles?.find((p) => ex!.primary.includes(p.muscle));
-    const extraSets = pr ? (pr.level === 2 ? 1 : exercises.some((e) => getExercise(e.exerciseId)?.primary.includes(pr.muscle)) ? 0 : 1) : 0;
-    exercises.push(
-      toRoutineExercise(ex, profile.goal, profile.experience, exercises.length === 0, extraSets)
-    );
+    picked.push(ex);
+  }
+
+  // Orden final por el ejercicio real elegido: compuestos prioritarios → compuestos →
+  // aislamientos prioritarios → aislamientos → core (siempre al final, protege la columna).
+  const priorities = opts.applyPriority === false ? [] : (profile.priorityMuscles ?? []);
+  const prioOf = (ex: Exercise) => priorities.find((p) => ex.primary.includes(p.muscle));
+  const rank = (ex: Exercise) => {
+    if (regionOf(ex.primary[0]) === 'core') return 4;
+    const base = ex.mechanics === 'compuesto' ? 0 : 2;
+    // Sólo se adelantan los prioritarios propios del día; los añadidos van en su sitio.
+    const leads = priorities.some((p) => dayMuscles.has(p.muscle) && ex.primary.includes(p.muscle));
+    return base + (leads ? 0 : 1);
+  };
+  const ordered = picked.map((ex, i) => ({ ex, i })).sort((a, b) => rank(a.ex) - rank(b.ex) || a.i - b.i);
+
+  const exercises: RoutineExercise[] = [];
+  const boosted = new Set<MuscleId>();
+  for (const { ex } of ordered) {
+    const pr = prioOf(ex);
+    // Nivel 2: +1 serie en cada ejercicio del músculo. Nivel 1: +1 serie en el primero.
+    let extraSets = 0;
+    if (pr && (pr.level === 2 || !boosted.has(pr.muscle))) extraSets = 1;
+    if (pr) boosted.add(pr.muscle);
+    exercises.push(toRoutineExercise(ex, profile.goal, profile.experience, exercises.length === 0, extraSets));
   }
 
   return {
     id: newUid('day'),
     name: opts.name,
-    focus: [...new Set(slots.map((s) => s.muscle))].slice(0, 6),
+    focus: [...new Set(ordered.map(({ ex }) => ex.primary[0]))].slice(0, 6),
     exercises,
   };
 }
+
+/** Versión del generador: si cambia, las rutinas no editadas se regeneran solas. */
+export const GENERATOR_VERSION = 3;
+
+/** Huella de los datos del perfil que afectan a la rutina. */
+export function profileKey(p: GeneratorProfile): string {
+  return JSON.stringify([
+    p.daysPerWeek,
+    p.sessionMinutes,
+    p.experience,
+    p.goal,
+    [...p.equipment].sort(),
+    [...p.injuries].sort(),
+    [...(p.priorityMuscles ?? [])].map((m) => `${m.muscle}:${m.level}`).sort(),
+    p.dayFocusPlan ?? [],
+  ]);
+}
+
+const FOCUS_TEMPLATES: Record<DayFocus, string[]> = {
+  pierna: ['piernaA', 'piernaB', 'piernaC'],
+  superior: ['torsoA', 'torsoB', 'empuje', 'tiron'],
+  completo: ['fullA', 'fullB', 'fullC'],
+};
 
 export function generateRoutine(
   profile: GeneratorProfile,
   modality: ModalityPreference = 'mixto'
 ): Routine {
   const days = Math.min(6, Math.max(2, profile.daysPerWeek));
-  const plan = SPLITS[days];
+  const customPlan =
+    profile.dayFocusPlan && profile.dayFocusPlan.length === days ? profile.dayFocusPlan : null;
+
+  let split: SplitType;
+  let templateKeys: string[];
+
+  if (customPlan) {
+    split = 'personalizada';
+    const focusIdx: Record<DayFocus, number> = { pierna: 0, superior: 0, completo: 0 };
+    templateKeys = customPlan.map((focus) => {
+      const pool = FOCUS_TEMPLATES[focus];
+      const key = pool[focusIdx[focus] % pool.length];
+      focusIdx[focus] += 1;
+      return key;
+    });
+  } else {
+    const plan = SPLITS[days];
+    split = plan.split;
+    templateKeys = plan.days;
+  }
+
   const usedInWeek = new Map<string, number>();
   const seen: Record<string, number> = {};
-  const routineDays = plan.days.map((key, i) => {
+  const routineDays = templateKeys.map((key, i) => {
     seen[key] = (seen[key] ?? 0) + 1;
     const tpl = T[key];
     const suffix = seen[key] > 1 ? ' (variante)' : '';
@@ -353,10 +455,13 @@ export function generateRoutine(
   const now = new Date().toISOString();
   return {
     id: 'current',
-    name: `Plan ${SPLIT_LABELS[plan.split]}`,
-    split: plan.split,
+    name: `Plan ${SPLIT_LABELS[split]}`,
+    split,
     modalityPreference: modality,
     days: routineDays,
+    generatorVersion: GENERATOR_VERSION,
+    profileKey: profileKey(profile),
+    edited: false,
     createdAt: now,
     updatedAt: now,
   };

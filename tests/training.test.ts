@@ -4,6 +4,7 @@ import {
   allowedEquipmentFor,
   buildCustomDay,
   generateRoutine,
+  profileKey,
   type GeneratorProfile,
 } from '@/lib/training/generator';
 import { estimate1RM, suggestNext, warmupSets, weeklyStreak } from '@/lib/training/progression';
@@ -76,10 +77,51 @@ describe('generador de rutinas', () => {
     expect(machine / all.length).toBeGreaterThan(0.5);
   });
 
-  it('coloca primero los músculos prioritarios', () => {
+  it('da énfasis a los prioritarios: antes que otros aislamientos y con series extra', () => {
     const r = generateRoutine({ ...base, priorityMuscles: [{ muscle: 'deltoides_lateral', level: 2 }] });
-    const torso = r.days[0];
-    expect(getExercise(torso.exercises[0].exerciseId)!.primary).toContain('deltoides_lateral');
+    const torso = r.days[0].exercises.map((rx) => ({ rx, ex: getExercise(rx.exerciseId)! }));
+    const firstIso = torso.find((t) => t.ex.mechanics === 'aislamiento')!;
+    expect(firstIso.ex.primary).toContain('deltoides_lateral');
+    expect(firstIso.rx.sets).toBeGreaterThan(3);
+  });
+
+  it('la rutina sigue siendo completa aunque haya 4 músculos prioritarios', () => {
+    const priorityMuscles = [
+      { muscle: 'biceps', level: 2 },
+      { muscle: 'triceps', level: 2 },
+      { muscle: 'gluteo_mayor', level: 2 },
+      { muscle: 'abdomen', level: 2 },
+    ] as GeneratorProfile['priorityMuscles'];
+    const majors = ['cuadriceps', 'pectorales', 'dorsales', 'isquiotibiales'] as const;
+    const muscles = (r: ReturnType<typeof generateRoutine>, i: number) =>
+      new Set(r.days[i].exercises.flatMap((rx) => getExercise(rx.exerciseId)!.primary));
+    for (const daysPerWeek of [2, 3, 4, 5, 6]) {
+      for (const sessionMinutes of [30, 45, 60, 90] as const) {
+        const plain = generateRoutine({ ...base, daysPerWeek, sessionMinutes });
+        const r = generateRoutine({ ...base, daysPerWeek, sessionMinutes, priorityMuscles });
+        r.days.forEach((d, i) => {
+          const label = `${daysPerWeek}d ${sessionMinutes}min ${d.name}`;
+          // Ningún grupo muscular de la plantilla desaparece por tener prioritarios.
+          const withP = muscles(r, i);
+          for (const m of plain.days[i].exercises.map((rx) => getExercise(rx.exerciseId)!.primary[0])) {
+            expect(withP.has(m), `${label}: falta ${m}`).toBe(true);
+          }
+          // Como mucho 2 ejercicios extra por día.
+          expect(d.exercises.length, label).toBeLessThanOrEqual(plain.days[i].exercises.length + 2);
+        });
+      }
+    }
+    // En torso/pierna también se trabajan todos los grupos a lo largo de la semana.
+    const tp = generateRoutine({ ...base, priorityMuscles });
+    const week = new Set(tp.days.flatMap((d) => d.exercises.flatMap((rx) => getExercise(rx.exerciseId)!.primary)));
+    for (const m of [...majors, 'espalda_media', 'deltoides_lateral', 'pantorrillas'] as const) expect(week.has(m), m).toBe(true);
+  });
+
+  it('marca la rutina con la huella del perfil para regenerarla si cambia', () => {
+    const r = generateRoutine(base);
+    expect(r.profileKey).toBe(profileKey(base));
+    expect(r.edited).toBe(false);
+    expect(profileKey({ ...base, priorityMuscles: [{ muscle: 'biceps', level: 1 }] })).not.toBe(r.profileKey);
   });
 
   it('principiantes reciben menos series y más repeticiones en reserva', () => {
@@ -104,6 +146,20 @@ describe('generador de rutinas', () => {
     const alts = alternativesFor('press-banca-barra', base);
     expect(alts.length).toBeGreaterThan(3);
     alts.forEach((a) => expect(a.primary).toContain('pectorales'));
+  });
+
+  it('respeta la distribución personalizada de días de pierna y tren superior', () => {
+    const r = generateRoutine({
+      ...base,
+      daysPerWeek: 4,
+      dayFocusPlan: ['pierna', 'superior', 'pierna', 'pierna'],
+    });
+    expect(r.split).toBe('personalizada');
+    expect(r.days).toHaveLength(4);
+    expect(r.days[0].name).toMatch(/Pierna/i);
+    expect(r.days[1].name).toMatch(/Torso|Empuje|Tirón/i);
+    expect(r.days[2].name).toMatch(/Pierna/i);
+    expect(r.days[3].name).toMatch(/Pierna/i);
   });
 });
 

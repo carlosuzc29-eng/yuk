@@ -67,7 +67,7 @@ export function ExerciseDetail({ exercise, sex = 'male', injuries = [], actions 
   return (
     <div className="space-y-6">
       <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-3">
-        <ExerciseAnimation exercise={exercise} />
+        <ExerciseAnimation exercise={exercise} sex={sex} />
       </div>
 
       <ExerciseMeta exercise={exercise} />

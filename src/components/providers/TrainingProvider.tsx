@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthProvider';
+import type { DayFocus } from '@/types/user';
 import type { BodyWeightEntry, ModalityPreference, Routine, RoutineDay, Workout } from '@/types/training';
 import {
   addBodyWeight,
@@ -15,7 +16,7 @@ import {
   setActiveWorkout,
   updateGroupStats,
 } from '@/lib/training/storage';
-import { generateRoutine } from '@/lib/training/generator';
+import { GENERATOR_VERSION, generateRoutine, profileKey } from '@/lib/training/generator';
 import { sessionsThisWeek, weekKey, weeklyStreak } from '@/lib/training/progression';
 
 interface TrainingContextValue {
@@ -26,8 +27,11 @@ interface TrainingContextValue {
   loading: boolean;
   /** Día sugerido para hoy (rota según el último entrenamiento). */
   nextDay: RoutineDay | null;
+  /** Guarda una rutina editada a mano por el usuario. */
   saveRoutine: (r: Routine) => Promise<void>;
-  regenerate: (modality?: ModalityPreference) => Promise<void>;
+  /** El perfil cambió pero la rutina tiene ediciones manuales: se ofrece actualizarla. */
+  routineOutdated: boolean;
+  regenerate: (modality?: ModalityPreference, dayFocusPlan?: DayFocus[]) => Promise<void>;
   startWorkout: (w: Workout) => void;
   updateActive: (w: Workout) => void;
   discardActive: () => void;
@@ -91,7 +95,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, profile?.onboardingCompleted]);
 
-  const saveRoutine = useCallback(
+  const store = useCallback(
     async (r: Routine) => {
       if (!user) return;
       setRoutine(r);
@@ -101,13 +105,33 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
+  const saveRoutine = useCallback((r: Routine) => store({ ...r, edited: true }), [store]);
+
   const regenerate = useCallback(
-    async (modality: ModalityPreference = 'mixto') => {
+    async (modality: ModalityPreference = 'mixto', dayFocusPlan?: DayFocus[]) => {
       if (!user || !profile) return;
-      await saveRoutine(generateRoutine(profile, modality));
+      const nextProfile = dayFocusPlan
+        ? { ...profile, daysPerWeek: dayFocusPlan.length, dayFocusPlan }
+        : profile;
+      await store(generateRoutine(nextProfile, modality));
     },
-    [user, profile, saveRoutine]
+    [user, profile, store]
   );
+
+  // Si cambian los datos del perfil (días, minutos, prioridades…) o mejora el generador,
+  // la rutina se regenera sola salvo que el usuario la haya editado a mano.
+  const currentKey = profile?.onboardingCompleted ? profileKey(profile) : null;
+  const stale =
+    !!routine &&
+    !!currentKey &&
+    ((routine.generatorVersion ?? 1) < GENERATOR_VERSION || routine.profileKey !== currentKey);
+  const routineOutdated = stale && !!routine?.edited && routine.profileKey !== currentKey;
+
+  useEffect(() => {
+    if (loading || !stale || !routine || !profile) return;
+    if (routine.edited) return; // con ediciones manuales se ofrece actualizar desde /rutina
+    void store(generateRoutine(profile, routine.modalityPreference ?? 'mixto'));
+  }, [loading, stale, routine, profile, currentKey, store]);
 
   const startWorkout = useCallback(
     (w: Workout) => {
@@ -204,6 +228,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
       loading,
       nextDay,
       saveRoutine,
+      routineOutdated,
       regenerate,
       startWorkout,
       updateActive,
@@ -212,7 +237,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
       deleteWorkout,
       logBodyWeight,
     }),
-    [routine, workouts, bodyWeight, active, loading, nextDay, saveRoutine, regenerate, startWorkout, updateActive, discardActive, finishWorkout, deleteWorkout, logBodyWeight]
+    [routine, workouts, bodyWeight, active, loading, nextDay, saveRoutine, routineOutdated, regenerate, startWorkout, updateActive, discardActive, finishWorkout, deleteWorkout, logBodyWeight]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

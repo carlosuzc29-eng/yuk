@@ -5,7 +5,7 @@
  *
  * Convención de ángulos: 0° = hacia abajo, 90° = hacia delante (derecha), 180° = arriba, 270° = atrás.
  */
-import type { MuscleId } from '@/types/user';
+import type { MuscleId, Sex } from '@/types/user';
 
 export type V = [number, number];
 
@@ -173,15 +173,28 @@ export function limbFront(s: Seg): V {
   return mul([d[1] / l, -d[0] / l], s.ns);
 }
 
-function torsoOutline(hip: V, shoulder: V, front: V): string {
-  const prof: [number, number, number][] = [
-    // t, delante, detrás
-    [0, 8, 11],
-    [0.35, 9, 8],
-    [0.72, 12, 10],
-    [1, 7, 8],
-  ];
-  const fwd = prof.map(([t, f]) => add(lerpV(hip, shoulder, t), mul(front, f)));
+function torsoOutline(hip: V, shoulder: V, front: V, sex: Sex = 'male'): string {
+  const f = sex === 'female';
+  const prof: [number, number, number][] = f
+    ? [
+        // t, delante, detrás (silueta atlética femenina)
+        [-0.03, 7.5, 12.5],
+        [0.14, 8.2, 11.5],
+        [0.36, 7.2, 7.2],
+        [0.64, 11.5, 9.2],
+        [0.84, 10.0, 9.5],
+        [1.02, 5.8, 6.8],
+      ]
+    : [
+        // t, delante, detrás (silueta atlética masculina)
+        [-0.03, 8.5, 11.2],
+        [0.16, 8.8, 10.2],
+        [0.38, 9.0, 8.0],
+        [0.68, 13.0, 10.8],
+        [0.86, 11.2, 10.5],
+        [1.02, 6.8, 7.6],
+      ];
+  const fwd = prof.map(([t, fw]) => add(lerpV(hip, shoulder, t), mul(front, fw)));
   const back = prof.map(([t, , bk]) => add(lerpV(hip, shoulder, t), mul(front, -bk))).reverse();
   const pts = [...fwd, ...back];
   // Curva suave cerrada (Catmull-Rom → Bézier)
@@ -198,7 +211,8 @@ function torsoOutline(hip: V, shoulder: V, front: V): string {
   return d + 'Z';
 }
 
-export function buildSide(p: SidePose): Skeleton {
+export function buildSide(p: SidePose, sex: Sex = 'male'): Skeleton {
+  const f = sex === 'female';
   const hip = p.hip;
   const shoulder = add(hip, mul(dir(p.torso), L.torso));
   const headAng = p.torso + (p.head ?? 0);
@@ -223,18 +237,21 @@ export function buildSide(p: SidePose): Skeleton {
   const toe = add(leg.end, p.toe ?? [13, 4]);
   const toe2 = add(leg2.end, p.toe2 ?? p.toe ?? [13, 4]);
 
+  const armScale = f ? 0.88 : 1;
+  const legScale = f ? 0.98 : 1;
+
   return {
     view: 'side',
     segs: {
-      torso: { a: hip, b: shoulder, wa: 20, wb: 16, ns: 1 },
-      thigh2: { a: hip, b: leg2.joint, wa: 15, wb: 10, ns: 1, far: true },
-      shin2: { a: leg2.joint, b: leg2.end, wa: 10, wb: 6.5, ns: 1, far: true },
-      upperArm2: { a: shoulder, b: arm2.joint, wa: 10, wb: 7.5, ns: 1, far: true },
-      forearm2: { a: arm2.joint, b: arm2.end, wa: 7.5, wb: 5.5, ns: 1, far: true },
-      thigh: { a: hip, b: leg.joint, wa: 15, wb: 10, ns: 1 },
-      shin: { a: leg.joint, b: leg.end, wa: 10, wb: 6.5, ns: 1 },
-      upperArm: { a: shoulder, b: arm.joint, wa: 10, wb: 7.5, ns: 1 },
-      forearm: { a: arm.joint, b: arm.end, wa: 7.5, wb: 5.5, ns: 1 },
+      torso: { a: hip, b: shoulder, wa: f ? 19 : 20, wb: f ? 14.5 : 16.5, ns: 1 },
+      thigh2: { a: hip, b: leg2.joint, wa: 16 * legScale, wb: 10 * legScale, ns: 1, far: true },
+      shin2: { a: leg2.joint, b: leg2.end, wa: 10.5 * legScale, wb: 6 * legScale, ns: 1, far: true },
+      upperArm2: { a: shoulder, b: arm2.joint, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: 1, far: true },
+      forearm2: { a: arm2.joint, b: arm2.end, wa: 7.8 * armScale, wb: 5 * armScale, ns: 1, far: true },
+      thigh: { a: hip, b: leg.joint, wa: 16 * legScale, wb: 10 * legScale, ns: 1 },
+      shin: { a: leg.joint, b: leg.end, wa: 10.5 * legScale, wb: 6 * legScale, ns: 1 },
+      upperArm: { a: shoulder, b: arm.joint, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: 1 },
+      forearm: { a: arm.joint, b: arm.end, wa: 7.8 * armScale, wb: 5 * armScale, ns: 1 },
     },
     shoulder,
     hip,
@@ -246,19 +263,25 @@ export function buildSide(p: SidePose): Skeleton {
     ankle2: leg2.end,
     toe,
     toe2,
-    torsoPath: torsoOutline(hip, shoulder, torsoFront),
+    torsoPath: torsoOutline(hip, shoulder, torsoFront, sex),
     torsoFront,
   };
 }
 
 const CX = 120;
 
-export function buildFront(p: FrontPose): Skeleton {
+export function buildFront(p: FrontPose, sex: Sex = 'male'): Skeleton {
+  const f = sex === 'female';
   const shY = 46 + p.lift;
-  const shR: V = [CX + 21, shY];
-  const shL: V = [CX - 21, shY];
-  const hipR: V = [CX + 11, 98];
-  const hipL: V = [CX - 11, 98];
+  const shHalf = f ? 18.5 : 22;
+  const hipHalf = f ? 12.5 : 11;
+  const waistHalf = f ? 12.5 : 15;
+  const pelvisHalf = f ? 21 : 18.5;
+
+  const shR: V = [CX + shHalf, shY];
+  const shL: V = [CX - shHalf, shY];
+  const hipR: V = [CX + hipHalf, 98];
+  const hipL: V = [CX - hipHalf, 98];
   const head: V = [CX, 24];
 
   const elR = add(shR, mul(dir(p.arm), L.upperArm));
@@ -273,33 +296,28 @@ export function buildFront(p: FrontPose): Skeleton {
   const knL = add(hipL, mul(dir(legL), L.thigh));
   const anL = add(knL, mul(dir(legL), L.shin));
 
-  // Torso frontal: hombros anchos, cintura, cadera
-  const tp = [
-    [CX - 22, shY + 2],
-    [CX + 22, shY + 2],
-    [CX + 17, 74],
-    [CX + 15, 88],
-    [CX + 19, 100],
-    [CX - 19, 100],
-    [CX - 15, 88],
-    [CX - 17, 74],
-  ] as V[];
   const torsoPath =
-    `M ${tp[0][0]} ${tp[0][1]} Q ${CX} ${shY - 3} ${tp[1][0]} ${tp[1][1]} ` +
-    `Q ${CX + 21} 62 ${tp[2][0]} ${tp[2][1]} L ${tp[3][0]} ${tp[3][1]} Q ${CX + 20} 94 ${tp[4][0]} ${tp[4][1]} ` +
-    `L ${tp[5][0]} ${tp[5][1]} Q ${CX - 20} 94 ${tp[6][0]} ${tp[6][1]} L ${tp[7][0]} ${tp[7][1]} Q ${CX - 21} 62 ${tp[0][0]} ${tp[0][1]} Z`;
+    `M ${CX - shHalf - 1} ${shY + 2} ` +
+    `C ${CX - 10} ${shY - 4} ${CX + 10} ${shY - 4} ${CX + shHalf + 1} ${shY + 2} ` +
+    `C ${CX + shHalf + 2} ${shY + 14} ${CX + waistHalf + 4} 68 ${CX + waistHalf} 82 ` +
+    `C ${CX + waistHalf - 1} 90 ${CX + pelvisHalf} 94 ${CX + pelvisHalf} 102 ` +
+    `L ${CX - pelvisHalf} 102 ` +
+    `C ${CX - pelvisHalf} 94 ${CX - waistHalf + 1} 90 ${CX - waistHalf} 82 ` +
+    `C ${CX - waistHalf - 4} 68 ${CX - shHalf - 2} ${shY + 14} ${CX - shHalf - 1} ${shY + 2} Z`;
+
+  const armScale = f ? 0.88 : 1;
 
   return {
     view: 'front',
     segs: {
-      thigh2: { a: hipL, b: knL, wa: 15, wb: 10, ns: -1 },
-      shin2: { a: knL, b: anL, wa: 10, wb: 6.5, ns: -1 },
-      thigh: { a: hipR, b: knR, wa: 15, wb: 10, ns: 1 },
-      shin: { a: knR, b: anR, wa: 10, wb: 6.5, ns: 1 },
-      upperArm2: { a: shL, b: elL, wa: 10, wb: 7.5, ns: -1 },
-      forearm2: { a: elL, b: handL, wa: 7.5, wb: 5.5, ns: -1 },
-      upperArm: { a: shR, b: elR, wa: 10, wb: 7.5, ns: 1 },
-      forearm: { a: elR, b: handR, wa: 7.5, wb: 5.5, ns: 1 },
+      thigh2: { a: hipL, b: knL, wa: f ? 16 : 15.5, wb: 10, ns: -1 },
+      shin2: { a: knL, b: anL, wa: 10.5, wb: 6, ns: -1 },
+      thigh: { a: hipR, b: knR, wa: f ? 16 : 15.5, wb: 10, ns: 1 },
+      shin: { a: knR, b: anR, wa: 10.5, wb: 6, ns: 1 },
+      upperArm2: { a: shL, b: elL, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: -1 },
+      forearm2: { a: elL, b: handL, wa: 7.8 * armScale, wb: 5 * armScale, ns: -1 },
+      upperArm: { a: shR, b: elR, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: 1 },
+      forearm: { a: elR, b: handR, wa: 7.8 * armScale, wb: 5 * armScale, ns: 1 },
     },
     shoulder: shR,
     hip: hipR,
@@ -465,4 +483,93 @@ export function capsulePath(s: Seg): string {
   const b2 = add(s.b, mul(n, -s.wb / 2));
   const f = (v: V) => `${v[0].toFixed(1)} ${v[1].toFixed(1)}`;
   return `M ${f(a1)} L ${f(b1)} A ${(s.wb / 2).toFixed(1)} ${(s.wb / 2).toFixed(1)} 0 0 1 ${f(b2)} L ${f(a2)} A ${(s.wa / 2).toFixed(1)} ${(s.wa / 2).toFixed(1)} 0 0 1 ${f(a1)} Z`;
+}
+
+export type LimbKind = 'thigh' | 'shin' | 'upperArm' | 'forearm';
+
+/** Contorno anatómico esculpido con vientres musculares reales (cuádriceps, pantorrilla, bíceps, antebrazo). */
+export function anatomicalLimbPath(s: Seg, kind: LimbKind): string {
+  const d = sub(s.b, s.a);
+  const l = len(d) || 1;
+  const nf = limbFront(s); // normal hacia el frente anatómico
+  const f = (v: V) => `${v[0].toFixed(1)} ${v[1].toFixed(1)}`;
+
+  const ra = s.wa / 2;
+  const rb = s.wb / 2;
+
+  // Factores de abultamiento frontal (+nf) y posterior (-nf) en t = 0.35 y t = 0.7
+  const profile: Record<LimbKind, [number, number, number, number]> = {
+    thigh: [1.18, 0.96, 1.12, 0.92], // cuádriceps prominente al frente + isquiotibial detrás
+    shin: [0.85, 0.72, 1.38, 0.68], // tibia recta al frente + gastrocnemio curvo y tendón de Aquiles fino
+    upperArm: [1.12, 0.96, 1.12, 0.94], // deltoides/bíceps y tríceps
+    forearm: [1.16, 0.78, 1.12, 0.75], // braquiorradial lleno cerca del codo, fino en muñeca
+  };
+  const [f1, f2, b1k, b2k] = profile[kind];
+
+  const pt = (t: number, dist: number) => add(lerpV(s.a, s.b, t), mul(nf, dist));
+  const aF = pt(0, ra);
+  const aB = pt(0, -ra);
+  const bF = pt(1, rb);
+  const bB = pt(1, -rb);
+
+  const cF1 = pt(0.32, lerp(ra, rb, 0.32) * f1);
+  const cF2 = pt(0.72, lerp(ra, rb, 0.72) * f2);
+  const cB1 = pt(0.72, -lerp(ra, rb, 0.72) * b2k);
+  const cB2 = pt(0.30, -lerp(ra, rb, 0.30) * b1k);
+
+  return (
+    `M ${f(aF)} ` +
+    `C ${f(cF1)} ${f(cF2)} ${f(bF)} ` +
+    `A ${rb.toFixed(1)} ${rb.toFixed(1)} 0 0 1 ${f(bB)} ` +
+    `C ${f(cB1)} ${f(cB2)} ${f(aB)} ` +
+    `A ${ra.toFixed(1)} ${ra.toFixed(1)} 0 0 1 ${f(aF)} Z`
+  );
+}
+
+/** Silueta anatómica de calzado deportivo / pie (talón, arco, suela y puntera). */
+export function footPath(ankle: V, toe: V): string {
+  const d = sub(toe, ankle);
+  const l = len(d) || 1;
+  const u: V = [d[0] / l, d[1] / l];
+  const down: V = [-u[1], u[0]];
+  // Asegurar que `down` apunta hacia abajo (y+)
+  const dn: V = down[1] >= 0 ? down : [-down[0], -down[1]];
+  const f = (v: V) => `${v[0].toFixed(1)} ${v[1].toFixed(1)}`;
+
+  const heelTop = add(ankle, mul(u, -4.5));
+  const heelBot = add(add(ankle, mul(u, -4.2)), mul(dn, 4.8));
+  const arch = add(lerpV(ankle, toe, 0.45), mul(dn, 4.6));
+  const toeBot = add(add(toe, mul(u, 2)), mul(dn, 3.6));
+  const toeTop = add(add(toe, mul(u, 1.2)), mul(dn, -1.6));
+  const instep = add(lerpV(ankle, toe, 0.42), mul(dn, -2.2));
+  const ankleTop = add(ankle, mul(dn, -3.2));
+
+  return (
+    `M ${f(ankleTop)} ` +
+    `Q ${f(instep)} ${f(toeTop)} ` +
+    `Q ${f(add(toe, mul(u, 3.5)))} ${f(toeBot)} ` +
+    `Q ${f(arch)} ${f(heelBot)} ` +
+    `Q ${f(add(heelTop, mul(dn, 2)))} ${f(heelTop)} Z`
+  );
+}
+
+/** Cabeza esculpida con perfil facial realista (frente, nariz, mentón, cráneo). */
+export function sideHeadPath(head: V, neckBase: V): string {
+  const d = sub(head, neckBase);
+  const l = len(d) || 1;
+  const up: V = [d[0] / l, d[1] / l];
+  // Frente apunta a la derecha (x+) cuando la figura está erguida
+  const fwd: V = [-up[1], up[0]];
+  const f = (v: V) => `${v[0].toFixed(1)} ${v[1].toFixed(1)}`;
+  const p = (fx: number, fy: number) => add(add(head, mul(fwd, fx)), mul(up, fy));
+
+  return (
+    `M ${f(p(-2, -9.5))} ` +
+    `C ${f(p(-10.5, -8.5))} ${f(p(-11.5, 4.5))} ${f(p(-4.5, 9.8))} ` +
+    `C ${f(p(2.5, 11.5))} ${f(p(9.2, 8.2))} ${f(p(9.6, 2.2))} ` +
+    `L ${f(p(11.0, -0.5))} ` +
+    `L ${f(p(9.2, -2.0))} ` +
+    `C ${f(p(9.4, -5.2))} ${f(p(7.5, -8.5))} ${f(p(4.2, -9.2))} ` +
+    `C ${f(p(1.5, -9.8))} ${f(p(-0.5, -9.8))} ${f(p(-2, -9.5))} Z`
+  );
 }

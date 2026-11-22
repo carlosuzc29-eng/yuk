@@ -7,6 +7,7 @@ import { useAuth } from '@/components/providers/AuthProvider';
 import { saveUserProfile } from '@/lib/firebase/auth-service';
 import { calculateNutritionEstimate } from '@/lib/nutrition/calculator';
 import { MuscleMapSVG } from '@/components/onboarding/MuscleMapSVG';
+import { DayFocusPicker } from '@/components/onboarding/DayFocusPicker';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { MedicalDisclaimer } from '@/components/ui/MedicalDisclaimer';
@@ -15,6 +16,8 @@ import {
   GOAL_LABELS,
   INJURY_LABELS,
   MUSCLE_LABELS,
+  defaultDayFocusPlan,
+  type DayFocus,
   type EquipmentType,
   type ExperienceLevel,
   type FitnessGoal,
@@ -66,6 +69,10 @@ export default function OnboardingPage() {
 
   // Paso 3: Disponibilidad
   const [daysPerWeek, setDaysPerWeek] = useState(4);
+  const [dayFocusPlan, setDayFocusPlan] = useState<DayFocus[]>(() =>
+    defaultDayFocusPlan(4, 'male')
+  );
+  const [customDayPlan, setCustomDayPlan] = useState(false);
   const [sessionMinutes, setSessionMinutes] = useState<30 | 45 | 60 | 75 | 90>(60);
   const [equipment, setEquipment] = useState<EquipmentType[]>(['gimnasio_completo']);
 
@@ -92,6 +99,12 @@ export default function OnboardingPage() {
       setBodyFatPct(profile.bodyFatPct ? String(profile.bodyFatPct) : '');
       setExperience(profile.experience);
       setDaysPerWeek(profile.daysPerWeek);
+      if (profile.dayFocusPlan && profile.dayFocusPlan.length === profile.daysPerWeek) {
+        setDayFocusPlan(profile.dayFocusPlan);
+        setCustomDayPlan(true);
+      } else {
+        setDayFocusPlan(defaultDayFocusPlan(profile.daysPerWeek, profile.sex));
+      }
       setSessionMinutes(profile.sessionMinutes);
       setEquipment(profile.equipment.length ? profile.equipment : ['gimnasio_completo']);
       setInjuries(profile.injuries.length ? profile.injuries : ['ninguna']);
@@ -196,6 +209,10 @@ export default function OnboardingPage() {
       bodyFatPct: bodyFatPct ? Number(bodyFatPct) : null,
       experience,
       daysPerWeek,
+      dayFocusPlan:
+        dayFocusPlan.length === daysPerWeek
+          ? dayFocusPlan
+          : defaultDayFocusPlan(daysPerWeek, sex),
       sessionMinutes,
       equipment,
       injuries,
@@ -292,7 +309,12 @@ export default function OnboardingPage() {
                       <button
                         key={opt.id}
                         type="button"
-                        onClick={() => setSex(opt.id)}
+                        onClick={() => {
+                          setSex(opt.id);
+                          if (!customDayPlan) {
+                            setDayFocusPlan(defaultDayFocusPlan(daysPerWeek, opt.id));
+                          }
+                        }}
                         data-active={sex === opt.id}
                         className="choice min-h-[48px] font-medium text-sm"
                       >
@@ -405,7 +427,10 @@ export default function OnboardingPage() {
                       <button
                         key={d}
                         type="button"
-                        onClick={() => setDaysPerWeek(d)}
+                        onClick={() => {
+                          setDaysPerWeek(d);
+                          setDayFocusPlan(defaultDayFocusPlan(d, sex));
+                        }}
                         data-active={daysPerWeek === d}
                         className="choice min-h-[52px] text-2xl font-light tabular-nums"
                       >
@@ -413,6 +438,18 @@ export default function OnboardingPage() {
                       </button>
                     ))}
                   </div>
+                </Card>
+
+                <Card className="p-4 space-y-3">
+                  <DayFocusPicker
+                    daysPerWeek={daysPerWeek}
+                    sex={sex}
+                    value={dayFocusPlan}
+                    onChange={(next) => {
+                      setDayFocusPlan(next);
+                      setCustomDayPlan(true);
+                    }}
+                  />
                 </Card>
 
                 <Card className="p-4 space-y-3">
@@ -507,8 +544,8 @@ export default function OnboardingPage() {
             {step === 5 && (
               <div className="space-y-3">
                 <p className="text-sm text-[var(--text-muted)]">
-                  Elige hasta <span className="font-medium text-[var(--text)]">4 músculos prioritarios</span>. Recibirán volumen extra y
-                  aparecerán al inicio de tus sesiones.
+                  Elige hasta <span className="font-medium text-[var(--text)]">4 músculos prioritarios</span>. Tu rutina seguirá
+                  trabajando todo el cuerpo; estos músculos solo reciben énfasis: van antes, con series extra.
                 </p>
                 <MuscleMapSVG
                   sex={sex}
