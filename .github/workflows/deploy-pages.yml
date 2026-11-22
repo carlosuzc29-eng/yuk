@@ -9,8 +9,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: deploy-yuk-pages
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -25,8 +25,20 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
+            ${{ runner.os }}-nextjs-
+
       - name: Install dependencies
         run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
 
       - name: Build static export
         env:
@@ -37,7 +49,7 @@ jobs:
           NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: yuka-c4045.firebasestorage.app
           NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "971993651917"
           NEXT_PUBLIC_FIREBASE_APP_ID: 1:971993651917:web:7708cfd99439e651dfe784
-        run: npm run build
+        run: npm run build || (sleep 5 && npm run build)
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
