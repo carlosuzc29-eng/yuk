@@ -132,6 +132,12 @@ export interface Routine {
   split: SplitType;
   modalityPreference: ModalityPreference;
   days: RoutineDay[];
+  /** Versión del generador que creó la rutina. */
+  generatorVersion?: number;
+  /** Huella del perfil con el que se generó (para detectar cambios). */
+  profileKey?: string;
+  /** true si el usuario la modificó a mano. */
+  edited?: boolean;
   createdAt: string;
   updatedAt: string;
 }

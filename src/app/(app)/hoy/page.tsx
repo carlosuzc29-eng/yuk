@@ -239,7 +239,7 @@ export default function HoyPage() {
               ))}
             </div>
             <p className="text-xs text-[var(--text-muted)]">
-              Van al inicio de cada sesión y reciben series extra.
+              Tu rutina trabaja todo el cuerpo; estos músculos solo reciben énfasis: van primero, con series extra y algún ejercicio adicional.
             </p>
           </Card>
         )}
