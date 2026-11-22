@@ -76,8 +76,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Assets inmutables con hash de Next.js (/_next/static/)
-  if (url.pathname.includes('/_next/static/')) {
+  // Assets inmutables con hash de Next.js (/_next/static/) y modelos 3D GLB (/models/)
+  if (url.pathname.includes('/_next/static/') || url.pathname.includes('/models/')) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

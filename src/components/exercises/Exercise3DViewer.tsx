@@ -9,6 +9,11 @@ import { PATTERNS, type PatternDef } from '@/lib/exercises/poses';
 import { buildPose3D } from '@/lib/exercises/kinematics3d';
 import { createMannequin3D } from '@/lib/exercises/mannequin3d';
 import { createEquipment3D } from '@/lib/exercises/equipment3d';
+import {
+  createDrivenGLBCharacter,
+  preloadGLBCharacter,
+  type DrivenGLBCharacter,
+} from '@/lib/model3d/driveExercisePose';
 import { cn } from '@/lib/utils/cn';
 
 type CameraPreset = '3/4' | 'lateral' | 'frontal' | 'espalda';
@@ -193,10 +198,25 @@ export function Exercise3DViewer({
     grid.position.y = 0.002;
     scene.add(grid);
 
-    // Maniquí 3D + Equipamiento 3D
+    // Maniquí 3D: arranca al instante con la malla paramétrica ZBrush y en cuanto carga
+    // el modelo Blender real (`/models/hombre.glb` o `/models/mujer.glb`) lo sustituye con su esqueleto mixamorig.
     const mannequin = createMannequin3D(sex);
     mannequin.setActiveMuscles(exercise.primary, exercise.secondary);
     scene.add(mannequin.root);
+
+    let glbCharacter: DrivenGLBCharacter | null = null;
+    let disposed = false;
+
+    preloadGLBCharacter(sex)
+      .then((template) => {
+        if (disposed) return;
+        glbCharacter = createDrivenGLBCharacter(template, sex);
+        scene.add(glbCharacter.root);
+        mannequin.root.visible = false;
+      })
+      .catch(() => {
+        // Si no se puede cargar el GLB, se mantiene la escultura paramétrica 3D.
+      });
 
     const equipment = createEquipment3D(exercise, def);
     scene.add(equipment.root);
@@ -267,7 +287,11 @@ export function Exercise3DViewer({
       const pulse = isCon ? Math.sin(t * Math.PI) : 0;
 
       const { pose } = buildPose3D(exercise, animate ? t : 0.75, sex);
-      mannequin.update(pose, pulse);
+      if (glbCharacter) {
+        glbCharacter.applyPose(pose);
+      } else {
+        mannequin.update(pose, pulse);
+      }
       equipment.update(pose);
 
       // Suavizado de cámara orbital
@@ -293,9 +317,11 @@ export function Exercise3DViewer({
     raf = requestAnimationFrame(renderLoop);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(raf);
       ro.disconnect();
       io?.disconnect();
+      glbCharacter?.dispose();
       mannequin.dispose();
       equipment.dispose();
       floorGeo.dispose();

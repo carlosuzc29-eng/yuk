@@ -43,7 +43,18 @@ export default function EjerciciosPage() {
   }, [group, modality, search]);
 
   return (
-    <AppShell title="Ejercicios" subtitle={`${EXERCISES.length} ejercicios con técnica animada`}>
+    <AppShell
+      title="Ejercicios"
+      subtitle={`${EXERCISES.length} ejercicios con técnica animada`}
+      rightSlot={
+        <Link
+          href="/modelo-3d"
+          className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors"
+        >
+          Modelos 3D
+        </Link>
+      }
+    >
       <div className="space-y-5">
         <label className="relative block">
           <span className="sr-only">Buscar ejercicio o músculo</span>
