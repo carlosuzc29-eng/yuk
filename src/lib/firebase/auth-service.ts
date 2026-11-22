@@ -247,6 +247,7 @@ export async function createGroup(
   const inviteCode = generateInviteCode(6);
   const now = new Date().toISOString();
   const groupId = simpleLocalId();
+  const safeDisplayName = user.displayName.trim() || 'Atleta';
   const group: GroupInfo = {
     id: groupId,
     name: cleanName,
@@ -256,11 +257,11 @@ export async function createGroup(
   };
   const member: GroupMember = {
     uid: user.uid,
-    displayName: user.displayName,
+    displayName: safeDisplayName,
     role: 'admin',
     joinedAt: now,
     currentStreak: 0,
-    weeklyPlannedSessions: user.daysPerWeek ?? 4,
+    weeklyPlannedSessions: Math.min(14, Math.max(0, user.daysPerWeek ?? 4)),
     weeklyCompletedSessions: 0,
     monthlyCompliancePct: 0,
     lastWorkoutAt: null,
@@ -270,7 +271,15 @@ export async function createGroup(
   if (services) {
     const nowTs = Timestamp.fromDate(new Date(now));
     const batch = writeBatch(services.db);
-    batch.set(doc(services.db, 'groups', groupId), toFsTimestamps(group));
+    // El documento de grupo en Firestore NO incluye el campo `id` (va en la ruta).
+    batch.set(doc(services.db, 'groups', groupId), {
+      name: cleanName,
+      inviteCode,
+      adminUid: user.uid,
+      memberCount: 1,
+      createdAt: nowTs,
+      updatedAt: nowTs,
+    });
     batch.set(doc(services.db, 'groups', groupId, 'members', user.uid), toFsTimestamps(member));
     batch.set(doc(services.db, 'inviteCodes', inviteCode), {
       groupId,
@@ -316,11 +325,11 @@ export async function joinGroupByCode(
   const now = new Date().toISOString();
   const member: GroupMember = {
     uid: user.uid,
-    displayName: user.displayName,
+    displayName: user.displayName.trim() || 'Atleta',
     role: 'member',
     joinedAt: now,
     currentStreak: 0,
-    weeklyPlannedSessions: user.daysPerWeek ?? 4,
+    weeklyPlannedSessions: Math.min(14, Math.max(0, user.daysPerWeek ?? 4)),
     weeklyCompletedSessions: 0,
     monthlyCompliancePct: 0,
     lastWorkoutAt: null,
@@ -334,12 +343,19 @@ export async function joinGroupByCode(
     }
     const { groupId } = codeSnap.data() as { groupId: string };
     await setDoc(doc(services.db, 'groups', groupId, 'members', user.uid), toFsTimestamps(member));
-    await updateDoc(doc(services.db, 'users', user.uid), {
-      groupId,
-      updatedAt: Timestamp.fromDate(new Date(now)),
-    });
+    await setDoc(
+      doc(services.db, 'users', user.uid),
+      {
+        groupId,
+        updatedAt: Timestamp.fromDate(new Date(now)),
+      },
+      { merge: true }
+    );
     const groupSnap = await getDoc(doc(services.db, 'groups', groupId));
-    return fromFsTimestamps<GroupInfo>(groupSnap.data() as Record<string, unknown>);
+    return fromFsTimestamps<GroupInfo>({
+      ...(groupSnap.data() as Record<string, unknown>),
+      id: groupSnap.id,
+    });
   }
 
   const groups = readJSON<Record<string, GroupInfo>>(LOCAL_KEYS.groups, {});
@@ -372,8 +388,13 @@ export async function getGroupAndMembers(
     const groupSnap = await getDoc(doc(services.db, 'groups', groupId));
     if (!groupSnap.exists()) return { group: null, members: [] };
     const membersSnap = await getDocs(collection(services.db, 'groups', groupId, 'members'));
-    const members = membersSnap.docs.map((d) => fromFsTimestamps<GroupMember>(d.data()));
-    return { group: fromFsTimestamps<GroupInfo>(groupSnap.data()), members };
+    const members = membersSnap.docs.map((d) =>
+      fromFsTimestamps<GroupMember>({ ...d.data(), uid: d.id })
+    );
+    return {
+      group: fromFsTimestamps<GroupInfo>({ ...groupSnap.data(), id: groupSnap.id }),
+      members,
+    };
   }
 
   const groups = readJSON<Record<string, GroupInfo>>(LOCAL_KEYS.groups, {});
