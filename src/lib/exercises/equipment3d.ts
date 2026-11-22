@@ -438,6 +438,12 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     updaters.push((pose) => {
       dbL.position.copy(pose.wristL);
       dbR.position.copy(pose.wristR);
+      if (pose.gripAxisL && pose.gripAxisL.lengthSq() > 1e-4) {
+        dbL.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), pose.gripAxisL);
+      }
+      if (pose.gripAxisR && pose.gripAxisR.lengthSq() > 1e-4) {
+        dbR.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), pose.gripAxisR);
+      }
       if (exercise.unilateral) dbL.visible = false;
     });
   } else if (exercise.equipment === 'kettlebell') {

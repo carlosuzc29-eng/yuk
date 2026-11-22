@@ -177,17 +177,55 @@ describe.each(['hombre.glb', 'mujer.glb'])('retargeting con %s', (file) => {
     expect(got.y).toBeLessThan(-0.9); // casi colgando, no atravesando el torso
   });
 
-  it('anima el esqueleto del GLB en ejercicios reales sin NaN', async () => {
+  it('anima el esqueleto del GLB en todos los ejercicios con pies en el suelo y agarre real en la palma', async () => {
     const model = await loadModel(file);
     const sex = file === 'mujer.glb' ? 'female' : 'male';
     const driven = createDrivenGLBCharacter(model, sex);
-    for (const ex of EXERCISES.slice(0, 8)) {
+
+    // Los 4 morph targets deben iniciar en 0 (no en [1,1,1,1] como venían del export)
+    expect(driven.skinnedMesh.morphTargetInfluences).toEqual([0, 0, 0, 0]);
+
+    const lFoot = bone(driven.root, 'leftfoot');
+    const rFoot = bone(driven.root, 'rightfoot');
+    const lLeg = bone(driven.root, 'leftleg');
+    const lUpLeg = bone(driven.root, 'leftupleg');
+    const lMid1 = bone(driven.root, 'lefthandmiddle1');
+    const lMid2 = bone(driven.root, 'lefthandmiddle2');
+    const rMid1 = bone(driven.root, 'righthandmiddle1');
+
+    for (const ex of EXERCISES) {
       for (const t of [0, 0.5, 1]) {
         const { pose } = buildPose3D(ex, t, sex);
         driven.applyPose(pose);
+
         expect(Number.isFinite(pose.wristL.x)).toBe(true);
         expect(Number.isFinite(pose.wristR.y)).toBe(true);
         expect(Number.isFinite(pose.ankleL.z)).toBe(true);
+
+        // El punto de agarre (wristL/R sincronizado) debe estar dentro de la mano cerrada (~2.5cm del nudillo medio)
+        const distGripL = pose.wristL.distanceTo(wpos(lMid1));
+        const distGripL2 = pose.wristL.distanceTo(wpos(lMid2));
+        const distGripR = pose.wristR.distanceTo(wpos(rMid1));
+        expect(distGripL, `${ex.id} gripL cerca de nudillo medio`).toBeLessThan(0.04);
+        expect(distGripL2, `${ex.id} gripL cerca de falange media`).toBeLessThan(0.055);
+        expect(distGripR, `${ex.id} gripR cerca de nudillo medio`).toBeLessThan(0.04);
+
+        // En ejercicios de pie (sentadilla, peso muerto, press militar, curl, elevación lateral),
+        // los pies nunca deben irse hacia arriba: permanecen apoyados en el suelo y debajo de las rodillas y caderas.
+        if (
+          ex.pattern === 'squat_back' ||
+          ex.pattern === 'squat_front' ||
+          ex.pattern === 'hinge' ||
+          ex.pattern === 'overhead_press' ||
+          ex.pattern === 'curl' ||
+          ex.pattern === 'lateral_raise' ||
+          ex.pattern === 'row_bent'
+        ) {
+          expect(wpos(lFoot).y, `${ex.id} t=${t} pie izq en suelo`).toBeLessThan(0.11);
+          expect(wpos(rFoot).y, `${ex.id} t=${t} pie der en suelo`).toBeLessThan(0.11);
+          expect(wpos(lFoot).y, `${ex.id} t=${t} pie debajo de rodilla`).toBeLessThan(wpos(lLeg).y);
+          expect(wpos(lLeg).y, `${ex.id} t=${t} rodilla debajo de cadera`).toBeLessThan(wpos(lUpLeg).y + 0.05);
+        }
       }
     }
     driven.dispose();

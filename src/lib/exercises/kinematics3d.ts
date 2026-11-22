@@ -37,6 +37,9 @@ export interface Pose3D {
   elbowR: THREE.Vector3;
   wristL: THREE.Vector3;
   wristR: THREE.Vector3;
+  /** Eje de los nudillos de cada mano para orientar mancuernas y agarres. */
+  gripAxisL?: THREE.Vector3;
+  gripAxisR?: THREE.Vector3;
 
   hipL: THREE.Vector3;
   hipR: THREE.Vector3;
@@ -216,11 +219,23 @@ function lateralConfigFor(
     case 'lunge':
     case 'split_squat_rear':
     case 'step_up':
-      handHalfWidth = equipment === 'barra' ? 0.32 : 0.22;
+    case 'farmer_carry':
+    case 'calf_raise':
+      handHalfWidth = equipment === 'barra' ? 0.33 : sh + 0.085;
       footHalfWidth = 0.12;
       kneeOutFlare = 0.04;
       break;
+    case 'curl':
+    case 'curl_preacher':
+    case 'curl_bayesian':
+      handHalfWidth = equipment === 'barra' ? 0.24 : sh + 0.045;
+      elbowOutFlare = 0.04;
+      footHalfWidth = 0.14;
+      break;
     default:
+      if (equipment === 'mancuernas' || equipment === 'kettlebell') {
+        handHalfWidth = Math.max(handHalfWidth, sh + 0.065);
+      }
       break;
   }
 
@@ -270,8 +285,49 @@ export function buildPose3D(
     const hipR = pelvis.clone().addScaledVector(torsoRight, hipHalf);
     const hipL = pelvis.clone().addScaledVector(torsoLeft, hipHalf);
 
-    const wristTargetR = side2DTo3D(sk.hand, 0).addScaledVector(torsoRight, handHalf);
-    const wristTargetL = side2DTo3D(sk.hand2, 0).addScaledVector(torsoLeft, handHalf);
+    let wristTargetR = side2DTo3D(sk.hand, 0).addScaledVector(torsoRight, handHalf);
+    let wristTargetL = side2DTo3D(sk.hand2, 0).addScaledVector(torsoLeft, handHalf);
+
+    // Ajustes anatómicos 3D para que las barras y mancuernas nunca atraviesen el torso, cuello ni muslos
+    if (exercise.pattern === 'squat_back' || exercise.pattern === 'good_morning') {
+      // En sentadilla trasera y buenos días, la barra apoya sobre el trapecio superior detrás del cuello
+      const barCenter = neckBase
+        .clone()
+        .addScaledVector(torsoForward, -0.095)
+        .addScaledVector(torsoUp, 0.02);
+      wristTargetR = barCenter.clone().addScaledVector(torsoRight, handHalf);
+      wristTargetL = barCenter.clone().addScaledVector(torsoLeft, handHalf);
+    } else if (exercise.pattern === 'squat_front') {
+      // En sentadilla frontal o goblet, la barra/pesa se sujeta delante de las clavículas/deltoides
+      const isGoblet = exercise.equipment !== 'barra';
+      const gh = isGoblet ? 0.075 : 0.26;
+      const barCenter = neckBase
+        .clone()
+        .addScaledVector(torsoForward, isGoblet ? 0.17 : 0.125)
+        .addScaledVector(torsoUp, isGoblet ? -0.06 : 0.015);
+      wristTargetR = barCenter.clone().addScaledVector(torsoRight, gh);
+      wristTargetL = barCenter.clone().addScaledVector(torsoLeft, gh);
+    } else if (exercise.pattern === 'hinge') {
+      // En peso muerto / bisagra de cadera, la barra/mancuernas bajan rozando delante de los muslos y tibias
+      const minFrontZ = Math.max(pelvis.z + 0.175, side2DTo3D(sk.segs.thigh!.b, 0).z + 0.085);
+      if (wristTargetR.z < minFrontZ) wristTargetR.z = minFrontZ;
+      if (wristTargetL.z < minFrontZ) wristTargetL.z = minFrontZ;
+    } else if (exercise.pattern === 'curl' || exercise.pattern === 'pushdown') {
+      // En curl de bíceps y jalón de tríceps de pie, las manos siempre operan por delante de los muslos/abdomen
+      const minFrontZ = pelvis.z + 0.175;
+      if (wristTargetR.z < minFrontZ) wristTargetR.z = minFrontZ;
+      if (wristTargetL.z < minFrontZ) wristTargetL.z = minFrontZ;
+    } else if (exercise.pattern === 'bench_press' || exercise.pattern === 'incline_press') {
+      // En press de banca/inclinado, en la parte baja la barra toca la superficie pectoral sin hundirse en el pecho
+      const minChestProj = 0.145;
+      for (const w of [wristTargetR, wristTargetL]) {
+        const rel = w.clone().sub(neckBase);
+        const fwdProj = rel.dot(torsoForward);
+        if (fwdProj < minChestProj) {
+          w.addScaledVector(torsoForward, minChestProj - fwdProj);
+        }
+      }
+    }
 
     const ankleTargetR = side2DTo3D(sk.ankle, 0).addScaledVector(torsoRight, cfg.footHalfWidth);
     const ankleTargetL = side2DTo3D(sk.ankle2, 0).addScaledVector(torsoLeft, cfg.footHalfWidth);
@@ -386,12 +442,13 @@ export function buildPose3D(
   const thighR = sk.segs.thigh!;
   const thighL = sk.segs.thigh2!;
 
+  const handZ = exercise.equipment === 'barra' ? 0.18 : 0.11;
   const shoulderL = front2DTo3D(uArmR.a, 0);
   const shoulderR = front2DTo3D(uArmL.a, 0);
-  const elbowL = front2DTo3D(uArmR.b, 0.02);
-  const elbowR = front2DTo3D(uArmL.b, 0.02);
-  const wristL = front2DTo3D(sk.hand, 0.06);
-  const wristR = front2DTo3D(sk.hand2, 0.06);
+  const elbowL = front2DTo3D(uArmR.b, 0.04);
+  const elbowR = front2DTo3D(uArmL.b, 0.04);
+  const wristL = front2DTo3D(sk.hand, handZ);
+  const wristR = front2DTo3D(sk.hand2, handZ);
 
   const hipL = front2DTo3D(thighR.a, 0);
   const hipR = front2DTo3D(thighL.a, 0);
