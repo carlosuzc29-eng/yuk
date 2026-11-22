@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPose3D } from '@/lib/exercises/kinematics3d';
+import { BONE_LEN_3D, buildPose3D } from '@/lib/exercises/kinematics3d';
 import {
   alternativesFor,
   allowedEquipmentFor,
@@ -163,7 +163,7 @@ describe('generador de rutinas', () => {
     expect(r.days[3].name).toMatch(/Pierna/i);
   });
 
-  it('genera poses 3D válidas y sin NaN para todos los ejercicios en silueta masculina y femenina', () => {
+  it('genera poses 3D válidas, longitudes óseas constantes y orientación correcta en todos los ejercicios', () => {
     for (const ex of EXERCISES) {
       for (const sex of ['male', 'female'] as const) {
         for (const t of [0, 0.5, 1]) {
@@ -188,9 +188,26 @@ describe('generador de rutinas', () => {
             expect(Number.isFinite(p.y), `${ex.id} ${sex} y`).toBe(true);
             expect(Number.isFinite(p.z), `${ex.id} ${sex} z`).toBe(true);
           }
+          if (pose.isSidePattern) {
+            // Ningún hueso se estira ni aplasta en IK 3D
+            expect(pose.shoulderR.distanceTo(pose.elbowR)).toBeCloseTo(BONE_LEN_3D.upperArm, 2);
+            expect(pose.elbowR.distanceTo(pose.wristR)).toBeCloseTo(BONE_LEN_3D.forearm, 2);
+            expect(pose.hipR.distanceTo(pose.kneeR)).toBeCloseTo(BONE_LEN_3D.thigh, 2);
+            expect(pose.kneeR.distanceTo(pose.ankleR)).toBeCloseTo(BONE_LEN_3D.shin, 2);
+          }
         }
       }
     }
+
+    // Orientación biomecánica del torso en ejercicios tumbados boca arriba, boca abajo y de pie
+    const bench = buildPose3D(getExercise('press-banca-barra')!, 0.5, 'male').pose;
+    expect(bench.torsoForward.y).toBeGreaterThan(0.8); // Pecho mira hacia el techo (+Y)
+
+    const pushup = buildPose3D(getExercise('flexiones')!, 0.5, 'male').pose;
+    expect(pushup.torsoForward.y).toBeLessThan(-0.8); // Pecho mira hacia el suelo (-Y)
+
+    const squat = buildPose3D(getExercise('sentadilla-barra')!, 0, 'male').pose;
+    expect(squat.torsoForward.z).toBeGreaterThan(0.8); // Pecho mira al frente (+Z)
   });
 });
 

@@ -432,14 +432,19 @@ function FigureSVG({
   const limb = (name: SegName, kind: LimbKind, far = false) => {
     const s = segOf(name);
     if (!s) return null;
+    const fillUrl = far ? `url(#${uid}-far)` : `url(#${uid}-near)`;
     return (
-      <path
-        d={anatomicalLimbPath(s, kind)}
-        fill={far ? `url(#${uid}-far)` : `url(#${uid}-near)`}
-        stroke="var(--fig-line)"
-        strokeWidth={far ? 0.65 : 0.85}
-        strokeLinejoin="round"
-      />
+      <g>
+        <circle cx={s.a[0]} cy={s.a[1]} r={s.wa * 0.44} fill={fillUrl} />
+        <path
+          d={anatomicalLimbPath(s, kind)}
+          fill={fillUrl}
+          stroke="var(--fig-line)"
+          strokeWidth={far ? 0.55 : 0.75}
+          strokeLinejoin="round"
+        />
+        <circle cx={s.b[0]} cy={s.b[1]} r={s.wb * 0.46} fill={fillUrl} />
+      </g>
     );
   };
 
@@ -477,24 +482,24 @@ function FigureSVG({
       className={fill ? 'block w-full h-full select-none' : 'w-full h-auto select-none'}
     >
       <defs>
-        {/* Iluminación escultórica 3D para cuerpo cercano */}
-        <linearGradient id={`${uid}-near`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--fig)" stopOpacity="1" />
-          <stop offset="60%" stopColor="var(--fig)" stopOpacity="0.92" />
-          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.95" />
+        {/* Iluminación escultórica 3D estilo ZBrush Clay para cuerpo cercano */}
+        <linearGradient id={`${uid}-near`} x1="15%" y1="10%" x2="85%" y2="90%">
+          <stop offset="0%" stopColor="#e8ebf0" stopOpacity="1" />
+          <stop offset="52%" stopColor="var(--fig)" stopOpacity="0.96" />
+          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.98" />
         </linearGradient>
 
         {/* Profundidad para extremidades lejanas */}
-        <linearGradient id={`${uid}-far`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="var(--fig-far)" stopOpacity="0.88" />
-          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.68" />
+        <linearGradient id={`${uid}-far`} x1="15%" y1="10%" x2="85%" y2="90%">
+          <stop offset="0%" stopColor="var(--fig)" stopOpacity="0.88" />
+          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.72" />
         </linearGradient>
 
         {/* Torso con relieve de luz cenital */}
         <linearGradient id={`${uid}-torso`} x1="15%" y1="0%" x2="85%" y2="100%">
-          <stop offset="0%" stopColor="var(--fig)" stopOpacity="1" />
-          <stop offset="55%" stopColor="var(--fig)" stopOpacity="0.95" />
-          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.9" />
+          <stop offset="0%" stopColor="#eef1f6" stopOpacity="1" />
+          <stop offset="50%" stopColor="var(--fig)" stopOpacity="0.97" />
+          <stop offset="100%" stopColor="var(--fig-far)" stopOpacity="0.92" />
         </linearGradient>
 
         {/* Calzado deportivo */}

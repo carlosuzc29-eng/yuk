@@ -311,21 +311,21 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     });
   }
 
-  // Máquina de press de pecho / hombro / hack squat: estructura trasera + brazos articulados
+  // Máquina de press de pecho / hombro: estructura trasera + brazos articulados
   if (
     exercise.equipment === 'maquina' &&
     (exercise.pattern === 'chest_press_machine' ||
       exercise.pattern === 'overhead_press_seated' ||
-      exercise.pattern === 'row_chest_supported' ||
-      exercise.pattern === 'squat_machine')
+      exercise.pattern === 'row_chest_supported')
   ) {
-    // Torre de peso trasera
+    const isRow = exercise.pattern === 'row_chest_supported';
+    const colZ = isRow ? 0.62 : -0.58;
     const machineCol = box(0.36, 1.65, 0.22, steelMat);
-    machineCol.position.set(0, 0.825, -0.58);
+    machineCol.position.set(0, 0.825, colZ);
     root.add(machineCol);
     for (let i = 0; i < 8; i++) {
       const brick = box(0.28, 0.045, 0.14, stackMat);
-      brick.position.set(0, 0.2 + i * 0.06, -0.58);
+      brick.position.set(0, 0.2 + i * 0.06, colZ);
       root.add(brick);
     }
 
@@ -336,13 +336,29 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     root.add(leverL, leverR, gripL, gripR);
 
     updaters.push((pose) => {
-      const pivotL = new THREE.Vector3(0.28, 1.38, -0.45);
-      const pivotR = new THREE.Vector3(-0.28, 1.38, -0.45);
+      const pivotZ = isRow ? 0.5 : -0.45;
+      const pivotL = new THREE.Vector3(pose.wristL.x, 1.38, pivotZ);
+      const pivotR = new THREE.Vector3(pose.wristR.x, 1.38, pivotZ);
       orientCylinderBetween(leverL, pivotL, pose.wristL);
       orientCylinderBetween(leverR, pivotR, pose.wristR);
       gripL.position.copy(pose.wristL);
       gripR.position.copy(pose.wristR);
     });
+  } else if (exercise.pattern === 'squat_machine') {
+    // Máquina Hack Squat: rieles inclinados + plataforma de pies
+    for (const sx of [-0.34, 0.34]) {
+      const rail = cyl(0.022, 0.022, 1, chromeMat, 14);
+      orientCylinderBetween(
+        rail,
+        new THREE.Vector3(sx, 0.08, 0.05),
+        new THREE.Vector3(sx, 1.55, -0.45)
+      );
+      root.add(rail);
+    }
+    const footPlate = box(0.68, 0.05, 0.52, steelMat);
+    footPlate.position.set(0, 0.04, 0.16);
+    footPlate.rotation.x = 0.22;
+    root.add(footPlate);
   }
 
   // ─────────────── 4. IMPLEMENTOS EN MANOS (Barra olímpica, Mancuernas, Kettlebell, Rueda) ───────────────
@@ -393,6 +409,10 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     updaters.push((pose) => {
       const mid = pose.wristL.clone().lerp(pose.wristR, 0.5);
       barGroup.position.copy(mid);
+      const handAxis = pose.wristL.clone().sub(pose.wristR);
+      if (handAxis.lengthSq() > 1e-4) {
+        barGroup.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), handAxis.normalize());
+      }
     });
   } else if (exercise.equipment === 'mancuernas') {
     const buildDumbbell = () => {
