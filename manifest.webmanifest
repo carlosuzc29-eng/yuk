@@ -1,0 +1,19 @@
+{
+  "name": "YUK — Entrenamiento Personalizado",
+  "short_name": "YUK",
+  "description": "Entrenamiento de fuerza e hipertrofia personalizado para tu grupo de amigos. Offline-first.",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ff6105",
+  "lang": "es-419",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
