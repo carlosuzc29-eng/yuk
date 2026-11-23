@@ -443,8 +443,14 @@ function ExerciseLogCard({
       {open && (
         <div className="px-4 pb-4 space-y-4">
           {showDemo && (
-            <div className="rounded-[8px] bg-[var(--surface-elevated)] p-2">
+            <div className="rounded-[8px] bg-[var(--surface-elevated)] p-2.5 space-y-2.5">
               <ExerciseAnimation exercise={ex} />
+              <div className="rounded-[6px] border border-[var(--border)] bg-[var(--surface)] p-2.5 text-xs space-y-1">
+                <p className="font-medium text-[var(--text)]">
+                  Máquina / Estación: <span className="font-normal text-[var(--text-secondary)]">{ex.machineName}</span>
+                </p>
+                <p className="text-[var(--text-muted)] leading-relaxed">{ex.description}</p>
+              </div>
             </div>
           )}
 

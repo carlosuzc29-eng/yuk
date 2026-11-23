@@ -6,6 +6,7 @@ import type {
   MovementPattern,
 } from '@/types/training';
 import type { ExperienceLevel, InjuryType, MuscleId } from '@/types/user';
+import { getMachineSpec } from './machines';
 
 /**
  * Catálogo de ejercicios de YUK.
@@ -31,6 +32,7 @@ function e(
   beginnerTip: string,
   opts: Opts = {}
 ): Exercise {
+  const spec = getMachineSpec(id, pattern, equipment);
   return {
     id,
     name,
@@ -41,6 +43,10 @@ function e(
     primary,
     secondary,
     avoidIf,
+    machineName: spec.machineName,
+    machineSetup: spec.machineSetup,
+    description: spec.description,
+    defaultView: spec.defaultView,
     steps,
     mistakes,
     beginnerTip,
@@ -1110,7 +1116,7 @@ export function filterExercises(filter: ExerciseFilter): Exercise[] {
     if (filter.allowedEquipment && !filter.allowedEquipment.includes(x.equipment)) return false;
     if (filter.excludeInjuries?.length && x.avoidIf.some((i) => filter.excludeInjuries!.includes(i)))
       return false;
-    if (q && !normalize(x.name).includes(q)) return false;
+    if (q && !normalize(x.name).includes(q) && !normalize(x.machineName).includes(q)) return false;
     return true;
   }).sort((a, b) => {
     if (!filter.muscle) return 0;

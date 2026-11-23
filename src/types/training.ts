@@ -77,6 +77,8 @@ export type MovementPattern =
   | 'hip_adduction'
   | 'glute_kickback';
 
+export type View2DMode = 'lateral' | 'frontal' | 'espalda';
+
 export interface Exercise {
   id: string;
   name: string;
@@ -86,6 +88,14 @@ export interface Exercise {
   pattern: MovementPattern;
   mechanics: Mechanics;
   level: ExperienceLevel;
+  /** Nombre comercial y técnico real de la máquina, banco, estación o equipo utilizado. */
+  machineName: string;
+  /** Cómo ajustar y preparar la máquina o estación antes de iniciar la serie. */
+  machineSetup: string;
+  /** Descripción detallada de en qué máquina se realiza y cómo se ejecuta biomecánicamente. */
+  description: string;
+  /** Vista 2D principal recomendada por defecto ('lateral' | 'frontal' | 'espalda'). */
+  defaultView?: View2DMode;
   /** Pasos de ejecución en orden: preparación → ejecución → vuelta. */
   steps: string[];
   /** Errores frecuentes a evitar. */

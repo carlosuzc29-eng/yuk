@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yuk-shell-v5';
+const CACHE_NAME = 'yuk-shell-v6';
 const MODELS_CACHE = 'yuk-models-v1';
 const APP_SHELL = [
   './',

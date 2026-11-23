@@ -38,6 +38,7 @@ export default function EjerciciosPage() {
         (!modality || modalityOf(x.equipment) === modality) &&
         (!q ||
           normalize(x.name).includes(q) ||
+          normalize(x.machineName).includes(q) ||
           x.primary.some((m) => normalize(MUSCLE_LABELS[m]).includes(q)))
     );
   }, [group, modality, search]);
@@ -45,25 +46,17 @@ export default function EjerciciosPage() {
   return (
     <AppShell
       title="Ejercicios"
-      subtitle={`${EXERCISES.length} ejercicios con técnica animada`}
-      rightSlot={
-        <Link
-          href="/modelo-3d"
-          className="inline-flex items-center gap-1.5 rounded-[8px] border border-[var(--border)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent)] transition-colors"
-        >
-          Modelos 3D
-        </Link>
-      }
+      subtitle={`${EXERCISES.length} ejercicios en 2D (Lateral · Frontal · Espalda)`}
     >
       <div className="space-y-5">
         <label className="relative block">
-          <span className="sr-only">Buscar ejercicio o músculo</span>
+          <span className="sr-only">Buscar ejercicio, máquina o músculo</span>
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ash)]" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar ejercicio o músculo"
+            placeholder="Buscar ejercicio, máquina o músculo"
             className="field pl-11"
           />
         </label>
@@ -106,7 +99,10 @@ export default function EjerciciosPage() {
                     <ExerciseAnimation exercise={x} animate={false} staticT={0.9} showControls={false} fill />
                   </div>
                   <p className="mt-2.5 text-sm font-medium leading-snug">{x.name}</p>
-                  <p className="mt-1 text-xs text-[var(--text-muted)] leading-snug">
+                  <p className="mt-1 text-[11px] font-medium text-[var(--text-secondary)] line-clamp-1" title={x.machineName}>
+                    {x.machineName}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)] leading-snug">
                     {x.primary.map((m) => MUSCLE_LABELS[m]).join(', ')}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">

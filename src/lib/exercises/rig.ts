@@ -5,6 +5,7 @@
  *
  * Convención de ángulos: 0° = hacia abajo, 90° = hacia delante (derecha), 180° = arriba, 270° = atrás.
  */
+import type { ExerciseEquipment, MovementPattern, View2DMode } from '@/types/training';
 import type { MuscleId, Sex } from '@/types/user';
 
 export type V = [number, number];
@@ -148,7 +149,7 @@ export interface Seg {
 }
 
 export interface Skeleton {
-  view: 'side' | 'front';
+  view: 'side' | 'front' | 'back';
   segs: Partial<Record<SegName, Seg>>;
   shoulder: V;
   hip: V;
@@ -160,7 +161,7 @@ export interface Skeleton {
   ankle2: V;
   toe: V;
   toe2: V;
-  /** Contorno del torso (vista lateral) o trapecio (vista frontal). */
+  /** Contorno del torso (vista lateral, frontal o espalda). */
   torsoPath: string;
   /** Normal frontal del torso (vista lateral). */
   torsoFront: V;
@@ -270,8 +271,9 @@ export function buildSide(p: SidePose, sex: Sex = 'male'): Skeleton {
 
 const CX = 120;
 
-export function buildFront(p: FrontPose, sex: Sex = 'male'): Skeleton {
+export function buildFront(p: FrontPose, sex: Sex = 'male', view: 'front' | 'back' = 'front'): Skeleton {
   const f = sex === 'female';
+  const isBack = view === 'back';
   const shY = 46 + p.lift;
   const shHalf = f ? 18.5 : 22;
   const hipHalf = f ? 12.5 : 11;
@@ -284,13 +286,14 @@ export function buildFront(p: FrontPose, sex: Sex = 'male'): Skeleton {
   const hipL: V = [CX - hipHalf, 98];
   const head: V = [CX, 24];
 
-  const elR = add(shR, mul(dir(p.arm), L.upperArm));
-  const handR = add(elR, mul(dir(p.arm + p.elbow), L.forearm));
-  const elL = add(shL, mul(dir(-p.arm), L.upperArm));
-  const handL = add(elL, mul(dir(-(p.arm + p.elbow)), L.forearm));
+  const armAngR = isBack ? (p.leg2 !== undefined ? p.arm : p.arm) : p.arm;
+  const elR = add(shR, mul(dir(armAngR), L.upperArm));
+  const handR = add(elR, mul(dir(armAngR + p.elbow), L.forearm));
+  const elL = add(shL, mul(dir(-armAngR), L.upperArm));
+  const handL = add(elL, mul(dir(-(armAngR + p.elbow)), L.forearm));
 
-  const legR = p.leg;
-  const legL = -(p.leg2 ?? 3);
+  const legR = isBack ? (p.leg2 ?? 3) : p.leg;
+  const legL = isBack ? -p.leg : -(p.leg2 ?? 3);
   const knR = add(hipR, mul(dir(legR), L.thigh));
   const anR = add(knR, mul(dir(legR), L.shin));
   const knL = add(hipL, mul(dir(legL), L.thigh));
@@ -308,7 +311,7 @@ export function buildFront(p: FrontPose, sex: Sex = 'male'): Skeleton {
   const armScale = f ? 0.88 : 1;
 
   return {
-    view: 'front',
+    view,
     segs: {
       thigh2: { a: hipL, b: knL, wa: f ? 16 : 15.5, wb: 10, ns: -1 },
       shin2: { a: knL, b: anL, wa: 10.5, wb: 6, ns: -1 },
@@ -332,6 +335,301 @@ export function buildFront(p: FrontPose, sex: Sex = 'male'): Skeleton {
     torsoPath,
     torsoFront: [0, 0],
   };
+}
+
+/**
+ * Construye una proyección 2D Frontal ('front') o de Espalda ('back') a partir de una postura lateral (`skSide`),
+ * respetando la altura biomecánica de cada articulación y la apertura anatómica de agarre, codos, rodillas y pies.
+ */
+export function buildProjectedFrontBack(
+  skSide: Skeleton,
+  t: number,
+  sex: Sex,
+  view: 'front' | 'back',
+  pattern: MovementPattern,
+  equipment: ExerciseEquipment
+): Skeleton {
+  const f = sex === 'female';
+  const isBack = view === 'back';
+  const shHalf = f ? 18.5 : 22;
+  const hipHalf = f ? 12.5 : 11.5;
+  const waistHalf = f ? 12.5 : 15;
+  const pelvisHalf = f ? 21 : 18.5;
+
+  let handHalf = shHalf + 5;
+  let elbowHalf = shHalf + 6;
+  let footHalf = 14;
+  let kneeHalf = 14;
+
+  switch (pattern) {
+    case 'bench_press':
+    case 'incline_press':
+    case 'chest_press_machine':
+    case 'push_up':
+      handHalf = equipment === 'barra' ? 35 : 28;
+      elbowHalf = shHalf + 14;
+      footHalf = 16;
+      kneeHalf = 15;
+      break;
+    case 'fly_lying':
+      handHalf = lerp(11, 43, t);
+      elbowHalf = lerp(18, 35, t);
+      footHalf = 15;
+      kneeHalf = 14;
+      break;
+    case 'fly_cable':
+      handHalf = lerp(43, 9, t);
+      elbowHalf = lerp(36, 17, t);
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'rear_delt_fly':
+      handHalf = lerp(11, 43, t);
+      elbowHalf = lerp(17, 35, t);
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'face_pull':
+      handHalf = lerp(14, 28, t);
+      elbowHalf = lerp(19, 36, t);
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'pulldown':
+    case 'pull_up':
+      handHalf = 36;
+      elbowHalf = lerp(33, 27, t);
+      footHalf = 11;
+      kneeHalf = 11;
+      break;
+    case 'squat_back':
+    case 'good_morning':
+      handHalf = 36;
+      elbowHalf = 30;
+      footHalf = 18;
+      kneeHalf = lerp(16, 22, t);
+      break;
+    case 'squat_front':
+    case 'squat_machine':
+      handHalf = equipment === 'barra' ? 28 : 10;
+      elbowHalf = equipment === 'barra' ? 23 : 16;
+      footHalf = 18;
+      kneeHalf = lerp(16, 21, t);
+      break;
+    case 'leg_press':
+      handHalf = 24;
+      elbowHalf = 25;
+      footHalf = 16;
+      kneeHalf = 17;
+      break;
+    case 'hinge':
+      handHalf = equipment === 'barra' ? 26 : 23;
+      elbowHalf = 23;
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'hip_thrust':
+    case 'glute_bridge':
+      handHalf = 24;
+      elbowHalf = 26;
+      footHalf = 16;
+      kneeHalf = 17;
+      break;
+    case 'overhead_press':
+    case 'overhead_press_seated':
+    case 'pike_push_up':
+      handHalf = equipment === 'barra' ? 29 : 26;
+      elbowHalf = lerp(31, 25, t);
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'row_bent':
+    case 'row_chest_supported':
+    case 'inverted_row':
+      handHalf = equipment === 'barra' ? 29 : 24;
+      elbowHalf = lerp(23, 30, t);
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'row_seated':
+    case 'pushdown':
+    case 'triceps_overhead':
+    case 'kb_swing':
+    case 'ab_wheel':
+    case 'pallof_press':
+    case 'cable_crunch':
+    case 'straight_arm_pulldown':
+      handHalf = 11;
+      elbowHalf = 18;
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'curl':
+    case 'curl_preacher':
+    case 'curl_bayesian':
+    case 'skull_crusher':
+    case 'wrist_curl':
+      handHalf = equipment === 'barra' ? 22 : 24;
+      elbowHalf = shHalf + 2;
+      footHalf = 14;
+      kneeHalf = 14;
+      break;
+    case 'dip':
+    case 'hanging_leg_raise':
+      handHalf = 25;
+      elbowHalf = 27;
+      footHalf = 10;
+      kneeHalf = 10;
+      break;
+    default:
+      break;
+  }
+
+  // En posturas horizontales (press de banca, flexiones, plancha, curl femoral tumbado, puente),
+  // aplicamos una perspectiva elevada de 22° para que el tronco, cabeza y brazos se lean con total claridad
+  const rawHipY = skSide.hip[1];
+  const rawShY = skSide.shoulder[1];
+  const isHorizontalTorso = Math.abs(rawShY - rawHipY) < 26;
+  const hipY = rawHipY;
+  const shY = isHorizontalTorso ? Math.min(rawShY, hipY - 30) : rawShY;
+  const headY = isHorizontalTorso ? shY - 15 : Math.min(skSide.head[1], shY - 13);
+
+  const shR: V = [CX + shHalf, shY];
+  const shL: V = [CX - shHalf, shY];
+  const hipR: V = [CX + hipHalf, hipY];
+  const hipL: V = [CX - hipHalf, hipY];
+  const head: V = [CX, headY];
+
+  const sideElbow1 = skSide.segs.upperArm?.b ?? [CX, shY + 24];
+  const sideElbow2 = skSide.segs.upperArm2?.b ?? sideElbow1;
+  const sideKnee1 = skSide.segs.thigh?.b ?? [CX, hipY + 38];
+  const sideKnee2 = skSide.segs.thigh2?.b ?? sideKnee1;
+
+  const yOffset = shY - rawShY;
+  // Evitar que extremidades que apuntan hacia la cámara en vista lateral colapsen a longitud ~0 en Frontal/Espalda
+  const ensureSpan = (rootY: number, rawTargetY: number, minSpan = 14): number => {
+    const dy = rawTargetY - rootY;
+    if (Math.abs(dy) >= minSpan) return rawTargetY;
+    const sign = dy >= -1 ? 1 : -1;
+    return rootY + sign * minSpan;
+  };
+
+  const el1Y = ensureSpan(shY, sideElbow1[1] + yOffset * 0.65, 13);
+  const el2Y = ensureSpan(shY, sideElbow2[1] + yOffset * 0.65, 13);
+  const h1Y = ensureSpan(el1Y, skSide.hand[1] + yOffset * 0.5, 12);
+  const h2Y = ensureSpan(el2Y, skSide.hand2[1] + yOffset * 0.5, 12);
+
+  const kn1Y = ensureSpan(hipY, sideKnee1[1], 16);
+  const kn2Y = ensureSpan(hipY, sideKnee2[1], 16);
+  const an1Y = ensureSpan(kn1Y, Math.max(skSide.ankle[1], kn1Y + 15), 15);
+  const an2Y = ensureSpan(kn2Y, Math.max(skSide.ankle2[1], kn2Y + 15), 15);
+
+  // En vista de espalda, la derecha e izquierda de la pantalla se invierten respecto a la vista frontal
+  const elR: V = [CX + elbowHalf, isBack ? el2Y : el1Y];
+  const elL: V = [CX - elbowHalf, isBack ? el1Y : el2Y];
+  const handR: V = [CX + handHalf, isBack ? h2Y : h1Y];
+  const handL: V = [CX - handHalf, isBack ? h1Y : h2Y];
+
+  const knR: V = [CX + kneeHalf, isBack ? kn2Y : kn1Y];
+  const knL: V = [CX - kneeHalf, isBack ? kn1Y : kn2Y];
+  const anR: V = [CX + footHalf, isBack ? an2Y : an1Y];
+  const anL: V = [CX - footHalf, isBack ? an1Y : an2Y];
+
+  const midTorsoY = lerp(shY, hipY, 0.56);
+  const waistY = lerp(shY, hipY, 0.72);
+  const pelvisBotY = hipY + 4;
+
+  const torsoPath =
+    `M ${CX - shHalf - 1} ${shY + 2} ` +
+    `C ${CX - 10} ${shY - 4} ${CX + 10} ${shY - 4} ${CX + shHalf + 1} ${shY + 2} ` +
+    `C ${CX + shHalf + 2} ${midTorsoY} ${CX + waistHalf + 3} ${waistY - 6} ${CX + waistHalf} ${waistY} ` +
+    `C ${CX + waistHalf - 1} ${hipY - 4} ${CX + pelvisHalf} ${hipY - 2} ${CX + pelvisHalf} ${pelvisBotY} ` +
+    `L ${CX - pelvisHalf} ${pelvisBotY} ` +
+    `C ${CX - pelvisHalf} ${hipY - 2} ${CX - waistHalf + 1} ${hipY - 4} ${CX - waistHalf} ${waistY} ` +
+    `C ${CX - waistHalf - 3} ${waistY - 6} ${CX - shHalf - 2} ${midTorsoY} ${CX - shHalf - 1} ${shY + 2} Z`;
+
+  const armScale = f ? 0.88 : 1;
+
+  return {
+    view,
+    segs: {
+      thigh2: { a: hipL, b: knL, wa: f ? 16 : 15.5, wb: 10, ns: -1 },
+      shin2: { a: knL, b: anL, wa: 10.5, wb: 6, ns: -1 },
+      thigh: { a: hipR, b: knR, wa: f ? 16 : 15.5, wb: 10, ns: 1 },
+      shin: { a: knR, b: anR, wa: 10.5, wb: 6, ns: 1 },
+      upperArm2: { a: shL, b: elL, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: -1 },
+      forearm2: { a: elL, b: handL, wa: 7.8 * armScale, wb: 5 * armScale, ns: -1 },
+      upperArm: { a: shR, b: elR, wa: 10.5 * armScale, wb: 7.5 * armScale, ns: 1 },
+      forearm: { a: elR, b: handR, wa: 7.8 * armScale, wb: 5 * armScale, ns: 1 },
+    },
+    shoulder: shR,
+    hip: hipR,
+    head,
+    neck: [[CX, shY], [CX, headY + 9]],
+    hand: handR,
+    hand2: handL,
+    ankle: anR,
+    ankle2: anL,
+    toe: add(anR, [5, 3]),
+    toe2: add(anL, [-5, 3]),
+    torsoPath,
+    torsoFront: [0, 0],
+  };
+}
+
+/**
+ * Construye una vista Lateral ('side') cuando el patrón nativo del ejercicio es frontal
+ * (elevaciones laterales, encogimientos, abducción y aducción de cadera).
+ */
+export function buildSideFromFront(
+  p: FrontPose,
+  sex: Sex,
+  pattern: MovementPattern
+): Skeleton {
+  if (pattern === 'hip_abduction' || pattern === 'hip_adduction') {
+    // Sentado en la máquina de abducción/aducción visto de perfil
+    const openOffset = (p.leg - 3) * 0.25;
+    return buildSide(
+      {
+        hip: [82, 128],
+        torso: 184,
+        hand: [88, 132],
+        ankle: [126, 166 - openOffset],
+        ankle2: [124, 166],
+        toe: [13, 4],
+        kneeDir: [1, -1],
+        elbowDir: [-0.5, 1],
+      },
+      sex
+    );
+  }
+  if (pattern === 'shrug') {
+    // De pie realizando encogimiento vertical de trapecios visto de perfil
+    return buildSide(
+      {
+        hip: [99, 95],
+        torso: 180,
+        hand: [3, 55 + p.lift * 1.1],
+        handFrom: 'shoulder',
+        ankle: [101, 178],
+        elbowDir: [-0.3, 1],
+      },
+      sex
+    );
+  }
+  // Elevaciones laterales vistas de perfil (ligera inclinación escapular y brazo subiendo hasta el hombro)
+  const liftRatio = clamp((p.arm - 10) / 74, 0, 1);
+  return buildSide(
+    {
+      hip: [98, 95],
+      torso: 174,
+      hand: [lerp(6, 16, liftRatio), lerp(55, 2, liftRatio)],
+      handFrom: 'shoulder',
+      ankle: [101, 178],
+      elbowDir: [-0.4, 1],
+    },
+    sex
+  );
 }
 
 // ───────────────────────── Músculos ─────────────────────────
@@ -407,7 +705,8 @@ export function muscleShapes(sk: Skeleton, muscle: MuscleId): MuscleShape[] {
     return out;
   }
 
-  // Vista frontal
+  // Vista frontal o de espalda
+  const isBack = sk.view === 'back';
   const pairs: [SegName, SegName][] = [
     ['upperArm', 'upperArm2'],
     ['forearm', 'forearm2'],
@@ -423,48 +722,73 @@ export function muscleShapes(sk: Skeleton, muscle: MuscleId): MuscleShape[] {
     }
   };
   const shY = sk.shoulder[1];
+  const hipY = sk.hip[1];
+  const torsoH = Math.max(24, hipY - shY);
+  const yAt = (frac: number) => shY + torsoH * frac;
+
   switch (muscle) {
     case 'deltoides_lateral':
     case 'deltoides_anterior':
     case 'deltoides_posterior':
-      onLimb('upperArm', 0.14, 0.4, 2, 10);
+      onLimb('upperArm', 0.14, 0.42, 2, 10);
       break;
     case 'trapecio':
-      out.push({ key: 'trap-r', cx: CX + 10, cy: shY - 2, rx: 10, ry: 3.5, rot: 18 });
-      out.push({ key: 'trap-l', cx: CX - 10, cy: shY - 2, rx: 10, ry: 3.5, rot: -18 });
+      out.push({ key: 'trap-r', cx: CX + 10, cy: shY - 1.5, rx: 10, ry: 3.8, rot: 18 });
+      out.push({ key: 'trap-l', cx: CX - 10, cy: shY - 1.5, rx: 10, ry: 3.8, rot: -18 });
+      if (isBack) {
+        out.push({ key: 'trap-mid', cx: CX, cy: yAt(0.24), rx: 9.5, ry: torsoH * 0.22, rot: 0 });
+      }
+      break;
+    case 'espalda_media':
+      out.push({ key: 'rhom-r', cx: CX + 8.5, cy: yAt(0.28), rx: 7.5, ry: torsoH * 0.18, rot: -10 });
+      out.push({ key: 'rhom-l', cx: CX - 8.5, cy: yAt(0.28), rx: 7.5, ry: torsoH * 0.18, rot: 10 });
+      break;
+    case 'dorsales':
+      out.push({ key: 'lat-r', cx: CX + 13.5, cy: yAt(0.46), rx: 6.5, ry: torsoH * 0.26, rot: 14 });
+      out.push({ key: 'lat-l', cx: CX - 13.5, cy: yAt(0.46), rx: 6.5, ry: torsoH * 0.26, rot: -14 });
+      break;
+    case 'lumbares':
+      out.push({ key: 'lumb-r', cx: CX + 5.5, cy: yAt(0.76), rx: 4.5, ry: torsoH * 0.18, rot: 0 });
+      out.push({ key: 'lumb-l', cx: CX - 5.5, cy: yAt(0.76), rx: 4.5, ry: torsoH * 0.18, rot: 0 });
       break;
     case 'biceps':
     case 'triceps':
-      onLimb('upperArm', 0.58, 0.55, 0, 6);
+      onLimb('upperArm', 0.56, 0.56, 0, 6.5);
       break;
     case 'antebrazos':
       onLimb('forearm', 0.38, 0.6, 0, 6);
       break;
     case 'gluteo_medio':
-      onLimb('thigh', -0.02, 0.24, 9, 7);
+      onLimb('thigh', -0.02, 0.24, 9, 7.5);
       break;
     case 'gluteo_mayor':
-      onLimb('thigh', 0.1, 0.3, 2, 10);
+      if (isBack) {
+        out.push({ key: 'glut-r', cx: CX + 8.5, cy: hipY + 2, rx: 8.5, ry: 9.5, rot: 8 });
+        out.push({ key: 'glut-l', cx: CX - 8.5, cy: hipY + 2, rx: 8.5, ry: 9.5, rot: -8 });
+      } else {
+        onLimb('thigh', 0.1, 0.3, 2, 10);
+      }
       break;
     case 'aductores':
-      onLimb('thigh', 0.3, 0.5, -3.5, 6);
+      onLimb('thigh', 0.32, 0.5, -3.5, 6);
       break;
     case 'cuadriceps':
-      onLimb('thigh', 0.55, 0.7, 0.5, 8);
+    case 'isquiotibiales':
+      onLimb('thigh', 0.54, 0.7, 0.5, 8.2);
       break;
     case 'pantorrillas':
-      onLimb('shin', 0.3, 0.48, 0, 6);
+      onLimb('shin', 0.32, 0.5, 0, 6.8);
       break;
     case 'pectorales':
-      out.push({ key: 'pec-r', cx: CX + 10, cy: shY + 13, rx: 9, ry: 6, rot: 0 });
-      out.push({ key: 'pec-l', cx: CX - 10, cy: shY + 13, rx: 9, ry: 6, rot: 0 });
+      out.push({ key: 'pec-r', cx: CX + 10, cy: yAt(0.24), rx: 9.2, ry: Math.max(4.5, torsoH * 0.13), rot: 0 });
+      out.push({ key: 'pec-l', cx: CX - 10, cy: yAt(0.24), rx: 9.2, ry: Math.max(4.5, torsoH * 0.13), rot: 0 });
       break;
     case 'abdomen':
-      out.push({ key: 'abs', cx: CX, cy: 80, rx: 6.5, ry: 14, rot: 0 });
+      out.push({ key: 'abs', cx: CX, cy: yAt(0.62), rx: 6.8, ry: Math.max(8, torsoH * 0.27), rot: 0 });
       break;
     case 'oblicuos':
-      out.push({ key: 'obl-r', cx: CX + 13, cy: 82, rx: 3.5, ry: 11, rot: -8 });
-      out.push({ key: 'obl-l', cx: CX - 13, cy: 82, rx: 3.5, ry: 11, rot: 8 });
+      out.push({ key: 'obl-r', cx: CX + 13, cy: yAt(0.64), rx: 3.8, ry: Math.max(7, torsoH * 0.22), rot: -8 });
+      out.push({ key: 'obl-l', cx: CX - 13, cy: yAt(0.64), rx: 3.8, ry: Math.max(7, torsoH * 0.22), rot: 8 });
       break;
     default:
       break;

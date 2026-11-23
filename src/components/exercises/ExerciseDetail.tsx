@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { AlertTriangle, CheckCircle2, GraduationCap, XCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertTriangle, CheckCircle2, Dumbbell, GraduationCap, SlidersHorizontal, XCircle } from 'lucide-react';
 import type { Exercise } from '@/types/training';
 import type { InjuryType, Sex } from '@/types/user';
 import { INJURY_LABELS } from '@/types/user';
@@ -62,15 +62,74 @@ interface Props {
 }
 
 export function ExerciseDetail({ exercise, sex = 'male', injuries = [], actions }: Props) {
+  const [activeSex, setActiveSex] = useState<Sex>(sex);
   const conflicts = exercise.avoidIf.filter((i) => injuries.includes(i));
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-3">
-        <ExerciseAnimation exercise={exercise} sex={sex} />
+      <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-3 space-y-2.5">
+        <div className="flex items-center justify-between gap-2 px-1">
+          <span className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+            Vista técnica 2D · 3 ángulos
+          </span>
+          <div
+            role="group"
+            aria-label="Cambiar figura anatómica"
+            className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-elevated)] p-0.5"
+          >
+            {(['male', 'female'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setActiveSex(s)}
+                className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-colors cursor-pointer ${
+                  activeSex === s
+                    ? 'bg-[var(--text)] text-[var(--bg)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text)]'
+                }`}
+              >
+                {s === 'male' ? 'Hombre' : 'Mujer'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <ExerciseAnimation exercise={exercise} sex={activeSex} />
       </div>
 
       <ExerciseMeta exercise={exercise} />
+
+      {/* Ficha de la máquina real, cómo se hace y cómo ajustarla */}
+      <section
+        aria-labelledby="maquina-guia"
+        className="rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-4 space-y-3.5"
+      >
+        <div className="flex items-start gap-3">
+          <div className="h-9 w-9 shrink-0 rounded-[8px] bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
+            <Dumbbell className="h-4 w-4" strokeWidth={1.8} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p id="maquina-guia" className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-muted)]">
+              Máquina o estación de referencia
+            </p>
+            <p className="text-[15px] font-semibold text-[var(--text)] leading-snug mt-0.5">
+              {exercise.machineName}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-1.5 border-t border-[var(--border)] pt-3">
+          <p className="text-xs font-medium text-[var(--text)]">Cómo se hace y en qué máquina</p>
+          <p className="text-sm leading-relaxed text-[var(--text-secondary)]">{exercise.description}</p>
+        </div>
+
+        <div className="rounded-[6px] bg-[var(--surface-elevated)] p-3 flex items-start gap-2.5">
+          <SlidersHorizontal className="h-4 w-4 shrink-0 mt-0.5 text-[var(--accent)]" strokeWidth={1.8} />
+          <div className="space-y-0.5 text-xs leading-relaxed">
+            <p className="font-medium text-[var(--text)]">Ajuste previo de la máquina / estación</p>
+            <p className="text-[var(--text-secondary)]">{exercise.machineSetup}</p>
+          </div>
+        </div>
+      </section>
 
       {conflicts.length > 0 && (
         <div role="note" className="alert alert-error flex items-start gap-2.5">
