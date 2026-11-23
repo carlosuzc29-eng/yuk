@@ -57,7 +57,9 @@ const STAND: SidePose = {
   ankle: [101, 178],
 };
 
-const SUPINE_BENCH = { hip: [108, 140] as V, torso: 270, ankle: [134, 178] as V, kneeDir: [0.4, -1] as V };
+// Tumbado en banco: la cadera apoya cerca del final del banco y los pies quedan firmes en el suelo,
+// por delante de las rodillas (muslo casi horizontal, tibia casi vertical).
+const SUPINE_BENCH = { hip: [108, 140] as V, torso: 270, ankle: [150, 180] as V, kneeDir: [0.25, -1] as V };
 
 export const PATTERNS: Record<MovementPattern, PatternDef> = {
   // ───────── Piernas ─────────
@@ -137,8 +139,9 @@ export const PATTERNS: Record<MovementPattern, PatternDef> = {
   },
   hip_thrust: {
     view: 'side',
-    a: { hip: [90, 168], torso: 212, hand: [4, -9], handFrom: 'hip', ankle: [126, 178], kneeDir: [0.3, -1], elbowDir: [0, 1] },
-    b: { hip: [112, 128], torso: 265, hand: [4, -9], handFrom: 'hip', ankle: [126, 178], kneeDir: [0.3, -1], elbowDir: [0, 1] },
+    // Pies fijos y algo adelantados: arriba del todo el muslo queda horizontal y la tibia vertical (rodilla ~90°).
+    a: { hip: [90, 168], torso: 212, hand: [4, -9], handFrom: 'hip', ankle: [150, 178], kneeDir: [0.3, -1], elbowDir: [0, 1] },
+    b: { hip: [112, 128], torso: 265, hand: [4, -9], handFrom: 'hip', ankle: [150, 178], kneeDir: [0.3, -1], elbowDir: [0, 1] },
     toB: 'Eleva la cadera, aprieta glúteos', toA: 'Baja controlado', bIsEccentric: false,
     scene: bench(30, 34, 132),
   },
@@ -197,7 +200,7 @@ export const PATTERNS: Record<MovementPattern, PatternDef> = {
     a: { ...SUPINE_BENCH, hand: [58, 88], elbowDir: [0, 1] },
     b: { ...SUPINE_BENCH, hand: [68, 124], elbowDir: [0, 1] },
     toB: 'Baja a la parte baja del pecho', toA: 'Empuja hasta extender', bIsEccentric: true,
-    scene: bench(26, 110, 150),
+    scene: bench(24, 102, 150),
   },
   incline_press: {
     view: 'side',
@@ -238,7 +241,7 @@ export const PATTERNS: Record<MovementPattern, PatternDef> = {
     a: { ...SUPINE_BENCH, hand: [58, 90], elbowDir: [0.2, -1] },
     b: { ...SUPINE_BENCH, hand: [54, 130], elbowDir: [0.2, -1] },
     toB: 'Abre en arco hasta estirar', toA: 'Cierra con el mismo ángulo de codo', bIsEccentric: true,
-    scene: bench(26, 110, 150),
+    scene: bench(24, 102, 150),
   },
   overhead_press: {
     view: 'side',
@@ -325,7 +328,7 @@ export const PATTERNS: Record<MovementPattern, PatternDef> = {
   pull_up: {
     view: 'side',
     a: { hip: [100, 88], torso: 180, hand: [102, -24], ankle: [-6, 80], ankleFrom: 'hip', elbowDir: [1, 0.3], kneeDir: [1, 0] },
-    b: { hip: [100, 50], torso: 186, hand: [102, -24], ankle: [-6, 80], ankleFrom: 'hip', elbowDir: [1, 0.3], kneeDir: [1, 0] },
+    b: { hip: [100, 36], torso: 188, hand: [102, -24], ankle: [-8, 79], ankleFrom: 'hip', elbowDir: [1, 0.45], kneeDir: [1, 0] },
     toB: 'Tira hasta pasar la barbilla', toA: 'Baja a brazos extendidos', bIsEccentric: false,
     scene: [{ t: 'line', a: [60, -24], b: [150, -24], w: 3 }], ground: false,
   },
@@ -378,7 +381,7 @@ export const PATTERNS: Record<MovementPattern, PatternDef> = {
     a: { ...SUPINE_BENCH, hand: [50, 88], elbowDir: [0.2, -1] },
     b: { ...SUPINE_BENCH, hand: [40, 124], elbowDir: [0.2, -1] },
     toB: 'Baja flexionando solo los codos', toA: 'Extiende', bIsEccentric: true,
-    scene: bench(26, 110, 150),
+    scene: bench(24, 102, 150),
   },
   wrist_curl: {
     view: 'side',

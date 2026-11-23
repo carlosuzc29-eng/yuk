@@ -149,6 +149,16 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
       spine.position.set(0, -0.06, pad === 'backpad' ? -0.055 : 0.055);
       const grp = new THREE.Group();
       grp.add(padMesh, spine);
+      if (exercise.pattern === 'squat_machine' && pad === 'backpad') {
+        // Hack squat: almohadillas de hombros con asas, unidas al respaldo
+        for (const sx of [-1, 1]) {
+          const sPad = box(0.11, 0.07, 0.16, leatherMat);
+          sPad.position.set(sx * 0.13, 0.3, 0.1);
+          const handle = cyl(0.014, 0.014, 0.12, rubberMat, 10);
+          handle.position.set(sx * 0.2, 0.25, 0.17);
+          grp.add(sPad, handle);
+        }
+      }
       root.add(grp);
       updaters.push((pose) => {
         const mid = pose.pelvis.clone().lerp(pose.neckBase, 0.5);
@@ -207,18 +217,33 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     const sledGroup = new THREE.Group();
     const plate = box(0.68, 0.44, 0.05, steelMat);
     const tread = box(0.62, 0.38, 0.058, rubberMat);
-    sledGroup.add(plate, tread);
-    // Discos olímpicos cargados a los lados del trineo
-    for (const sx of [-0.42, 0.42]) {
-      const bumper = cyl(0.21, 0.21, 0.055, rubberMat, 24);
-      bumper.rotation.z = Math.PI / 2;
-      bumper.position.set(sx, 0, 0.12);
-      const ring = cyl(0.17, 0.17, 0.06, accentRingMat, 24);
+    // Carro: bastidor detrás de la plataforma, con dos soportes (horns) para los discos.
+    const carriage = box(0.8, 0.1, 0.34, steelMat);
+    carriage.position.set(0, 0, 0.24);
+    sledGroup.add(plate, tread, carriage);
+    for (const sx of [-1, 1]) {
+      const horn = cyl(0.025, 0.025, 0.24, chromeMat, 14);
+      horn.rotation.z = Math.PI / 2;
+      horn.position.set(sx * 0.52, 0, 0.36);
+      sledGroup.add(horn);
+      // Dos discos de 20 kg (Ø 45 cm) por lado, a escala real
+      for (const k of [0, 1]) {
+        const bumper = cyl(0.225, 0.225, 0.05, rubberMat, 32);
+        bumper.rotation.z = Math.PI / 2;
+        bumper.position.set(sx * (0.46 + k * 0.055), 0, 0.36);
+        sledGroup.add(bumper);
+      }
+      const ring = cyl(0.06, 0.06, 0.12, accentRingMat, 20);
       ring.rotation.z = Math.PI / 2;
-      ring.position.set(sx, 0, 0.12);
-      sledGroup.add(bumper, ring);
+      ring.position.set(sx * 0.485, 0, 0.36);
+      sledGroup.add(ring);
     }
     root.add(sledGroup);
+
+    // Bastidor del asiento y bancada que une asiento y rieles
+    const baseBeam = box(0.12, 0.08, 1.5, steelMat);
+    baseBeam.position.set(0, 0.04, 0.12);
+    root.add(baseBeam);
 
     // Rieles cromados inclinados 45°
     for (const sx of [-0.36, 0.36]) {
@@ -247,6 +272,10 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
 
     // Si es polea, construimos la columna metálica con pila de pesas en la posición del anclaje
     let towerBuilt = false;
+    // Placas seleccionadas (suben con el cable) y longitud de cable de referencia
+    const liftPlates: THREE.Object3D[] = [];
+    const liftBase: number[] = [];
+    let restCable = -1;
     const pulleyWheel = cyl(0.055, 0.055, 0.026, chromeMat, 20);
     pulleyWheel.rotation.z = Math.PI / 2;
     if (!isBand) root.add(pulleyWheel);
@@ -279,15 +308,43 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
         topBeam.position.set(towerX, towerH, towerZ);
         root.add(topBeam);
 
-        // Pila de placas de hierro (weight stack)
-        for (let i = 0; i < 10; i++) {
-          const brick = box(0.34, 0.042, 0.14, stackMat);
-          brick.position.set(towerX, 0.16 + i * 0.055, towerZ);
-          root.add(brick);
+        // Varillas guía de la pila
+        for (const dx of [-0.12, 0.12]) {
+          const rod = cyl(0.008, 0.008, towerH - 0.2, chromeMat, 8);
+          rod.position.set(towerX + dx, (towerH - 0.2) / 2 + 0.1, towerZ);
+          root.add(rod);
         }
+        // Pila de placas de hierro (weight stack): las 4 superiores son la carga seleccionada
+        for (let i = 0; i < 12; i++) {
+          const brick = box(0.32, 0.042, 0.13, stackMat);
+          const y = 0.14 + i * 0.048;
+          brick.position.set(towerX, y, towerZ);
+          root.add(brick);
+          if (i >= 8) {
+            liftPlates.push(brick);
+            liftBase.push(y);
+          }
+        }
+        // Pasador de selección
+        const pin = cyl(0.012, 0.012, 0.16, accentRingMat, 10);
+        pin.rotation.x = Math.PI / 2;
+        pin.position.set(towerX, 0.14 + 8 * 0.048, towerZ + 0.08);
+        root.add(pin);
+        liftPlates.push(pin);
+        liftBase.push(pin.position.y);
       }
 
       if (!isBand) pulleyWheel.position.copy(anchor);
+
+      // La pila sube lo mismo que se alarga el cable desde la posición inicial (máx. 45 cm).
+      if (!isBand && liftPlates.length) {
+        const hand = def.anchorAtAnkle ? pose.ankleR : pose.wristL.clone().lerp(pose.wristR, 0.5);
+        const len = anchor.distanceTo(hand);
+        // Referencia = cable más corto visto (pila apoyada); vale empiece el clip donde empiece.
+        if (restCable < 0 || len < restCable) restCable = len;
+        const lift = THREE.MathUtils.clamp(len - restCable, 0, 0.45);
+        liftPlates.forEach((pl, i) => (pl.position.y = liftBase[i] + lift));
+      }
 
       if (def.anchorAtAnkle) {
         orientCylinderBetween(cableL, anchor, pose.ankleR);
@@ -396,13 +453,27 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
 
     // En sentadillas o press de banca con barra, añadir postes del rack detrás para contexto real
     if (exercise.pattern === 'squat_back' || exercise.pattern === 'squat_front') {
-      for (const sx of [-0.58, 0.58]) {
-        const post = box(0.055, 1.9, 0.055, steelMat);
-        post.position.set(sx, 0.95, -0.35);
-        root.add(post);
-        const foot = box(0.09, 0.035, 0.72, steelMat);
-        foot.position.set(sx, 0.017, -0.2);
+      // Rack de sentadilla: 4 postes, soportes J a la altura del hombro y barras de seguridad
+      for (const sx of [-0.6, 0.6]) {
+        for (const pz of [-0.42, 0.18]) {
+          const post = box(0.07, 2.1, 0.07, steelMat);
+          post.position.set(sx, 1.05, pz);
+          root.add(post);
+        }
+        const foot = box(0.09, 0.04, 0.82, steelMat);
+        foot.position.set(sx, 0.02, -0.12);
         root.add(foot);
+        const topBar = box(0.07, 0.07, 0.67, steelMat);
+        topBar.position.set(sx, 2.1, -0.12);
+        root.add(topBar);
+        // Soporte J (donde descansa la barra antes de sacarla)
+        const jHook = box(0.06, 0.05, 0.12, accentRingMat);
+        jHook.position.set(sx, 1.38, 0.24);
+        root.add(jHook);
+        // Barra de seguridad a la altura de la sentadilla profunda
+        const safety = box(0.05, 0.05, 0.75, chromeMat);
+        safety.position.set(sx, 0.62, -0.12);
+        root.add(safety);
       }
     }
 
@@ -435,7 +506,16 @@ export function createEquipment3D(exercise: Exercise, def: PatternDef): Equipmen
     const dbR = buildDumbbell();
     root.add(dbL, dbR);
 
+    const goblet = exercise.pattern === 'squat_front';
+    if (goblet) dbL.visible = false;
     updaters.push((pose) => {
+      if (goblet) {
+        // Sentadilla goblet: UNA mancuerna vertical, cogida por el disco superior a la altura del esternón.
+        const mid = pose.wristL.clone().lerp(pose.wristR, 0.5);
+        dbR.position.copy(mid).addScaledVector(pose.torsoUp, -0.07);
+        dbR.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), pose.torsoUp);
+        return;
+      }
       dbL.position.copy(pose.wristL);
       dbR.position.copy(pose.wristR);
       if (pose.gripAxisL && pose.gripAxisL.lengthSq() > 1e-4) {

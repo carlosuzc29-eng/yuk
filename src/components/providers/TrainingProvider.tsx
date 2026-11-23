@@ -3,9 +3,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthProvider';
 import type { DayFocus } from '@/types/user';
-import type { BodyWeightEntry, ModalityPreference, Routine, RoutineDay, Workout } from '@/types/training';
+import type { BodyWeightEntry, FavoriteRoutine, ModalityPreference, Routine, RoutineDay, Workout } from '@/types/training';
 import {
   addBodyWeight,
+  deleteFavorite as removeFavoriteDoc,
+  listFavorites,
+  saveFavorite as persistFavorite,
   getActiveWorkout,
   getRoutine,
   listBodyWeight,
@@ -38,6 +41,11 @@ interface TrainingContextValue {
   finishWorkout: (w: Workout) => Promise<void>;
   deleteWorkout: (id: string) => Promise<void>;
   logBodyWeight: (weightKg: number, date?: string) => Promise<void>;
+  /** Rutinas guardadas en favoritos (planes completos o días sueltos), más recientes primero. */
+  favorites: FavoriteRoutine[];
+  addFavorite: (fav: FavoriteRoutine) => Promise<void>;
+  removeFavorite: (id: string) => Promise<void>;
+  renameFavorite: (id: string, name: string) => Promise<void>;
 }
 
 const Ctx = createContext<TrainingContextValue | null>(null);
@@ -54,6 +62,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
   const [bodyWeight, setBodyWeight] = useState<BodyWeightEntry[]>([]);
   const [active, setActive] = useState<Workout | null>(null);
   const [loading, setLoading] = useState(true);
+  const [favorites, setFavorites] = useState<FavoriteRoutine[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,16 +71,19 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
       setWorkouts([]);
       setBodyWeight([]);
       setActive(null);
+      setFavorites([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     (async () => {
       try {
-        const [r, w, bw] = await Promise.all([
+        const [r, w, bw, favs] = await Promise.all([
           getRoutine(user.uid),
           listWorkouts(user.uid),
           listBodyWeight(user.uid),
+          // Las favoritas no deben bloquear la carga si fallan.
+          listFavorites(user.uid).catch(() => [] as FavoriteRoutine[]),
         ]);
         let current = r;
         if (!current && profile?.onboardingCompleted) {
@@ -81,6 +93,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
         setRoutine(current);
         setWorkouts(w);
         setBodyWeight(bw);
+        setFavorites(favs);
         setActive(getActiveWorkout(user.uid));
       } catch {
         if (!cancelled) setActive(getActiveWorkout(user.uid));
@@ -210,6 +223,51 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
     [user]
   );
 
+  const addFavorite = useCallback(
+    async (fav: FavoriteRoutine) => {
+      if (!user) return;
+      setFavorites((all) => [fav, ...all.filter((f) => f.id !== fav.id)]);
+      try {
+        await persistFavorite(user.uid, fav);
+      } catch (e) {
+        setFavorites((all) => all.filter((f) => f.id !== fav.id));
+        throw e;
+      }
+    },
+    [user]
+  );
+
+  const removeFavorite = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      let removed: FavoriteRoutine | undefined;
+      setFavorites((all) => {
+        removed = all.find((f) => f.id === id);
+        return all.filter((f) => f.id !== id);
+      });
+      try {
+        await removeFavoriteDoc(user.uid, id);
+      } catch (e) {
+        if (removed) setFavorites((all) => [removed!, ...all]);
+        throw e;
+      }
+    },
+    [user]
+  );
+
+  const renameFavorite = useCallback(
+    async (id: string, name: string) => {
+      if (!user) return;
+      const fav = favorites.find((f) => f.id === id);
+      const clean = name.trim().slice(0, 60);
+      if (!fav || !clean || clean === fav.name) return;
+      const next = { ...fav, name: clean };
+      setFavorites((all) => all.map((f) => (f.id === id ? next : f)));
+      await persistFavorite(user.uid, next);
+    },
+    [user, favorites]
+  );
+
   const nextDay = useMemo(() => {
     if (!routine?.days.length) return null;
     const lastDone = workouts.find((w) => w.status === 'completed' && w.dayId);
@@ -236,8 +294,12 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
       finishWorkout,
       deleteWorkout,
       logBodyWeight,
+      favorites,
+      addFavorite,
+      removeFavorite,
+      renameFavorite,
     }),
-    [routine, workouts, bodyWeight, active, loading, nextDay, saveRoutine, routineOutdated, regenerate, startWorkout, updateActive, discardActive, finishWorkout, deleteWorkout, logBodyWeight]
+    [routine, workouts, bodyWeight, active, loading, nextDay, saveRoutine, routineOutdated, regenerate, startWorkout, updateActive, discardActive, finishWorkout, deleteWorkout, logBodyWeight, favorites, addFavorite, removeFavorite, renameFavorite]
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

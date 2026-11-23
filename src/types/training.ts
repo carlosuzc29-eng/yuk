@@ -142,6 +142,21 @@ export interface Routine {
   updatedAt: string;
 }
 
+/**
+ * Rutina guardada en favoritos: un plan completo (todos sus días) o un único día.
+ * Es una copia: editar la rutina actual no cambia la favorita, y viceversa.
+ */
+export interface FavoriteRoutine {
+  id: string;
+  kind: 'plan' | 'day';
+  name: string;
+  split: SplitType;
+  modalityPreference: ModalityPreference;
+  days: RoutineDay[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkoutSet {
   weightKg: number | null;
   reps: number | null;

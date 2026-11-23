@@ -19,13 +19,28 @@ import { cn } from '@/lib/utils/cn';
 type CameraPreset = '3/4' | 'lateral' | 'frontal' | 'espalda';
 
 const PRESET_ANGLES: Record<CameraPreset, { yaw: number; pitch: number }> = {
-  '3/4': { yaw: -0.78, pitch: 0.24 },
-  lateral: { yaw: -Math.PI / 2, pitch: 0.12 },
-  frontal: { yaw: 0.0, pitch: 0.15 },
-  espalda: { yaw: Math.PI, pitch: 0.18 },
+  '3/4': { yaw: -0.78, pitch: 0.22 },
+  lateral: { yaw: -Math.PI / 2, pitch: 0.1 },
+  frontal: { yaw: 0.0, pitch: 0.14 },
+  espalda: { yaw: Math.PI, pitch: 0.16 },
 };
 
-const ease = (x: number) => 0.5 - Math.cos(Math.PI * x) / 2;
+/**
+ * Ángulo "3/4" por ejercicio cuando el de frente queda tapado por la máquina.
+ * Prensa: desde atrás y por encima del hombro, para ver piernas y plataforma.
+ */
+const PATTERN_34: Partial<Record<Exercise['pattern'], { yaw: number; pitch: number }>> = {
+  leg_press: { yaw: -2.25, pitch: 0.42 },
+};
+
+/** FOV vertical moderado: poca distorsión sin alejar demasiado la cámara. */
+const FOV = 30;
+
+/**
+ * Curva de mínimo tirón (smootherstep): velocidad y aceleración nulas en los extremos,
+ * como un movimiento humano controlado. Evita los "arranques" bruscos de una interpolación coseno.
+ */
+const ease = (x: number) => x * x * x * (x * (x * 6 - 15) + 10);
 
 interface Timing {
   holdA: number;
@@ -36,20 +51,20 @@ interface Timing {
 
 function timingFor(def: PatternDef): Timing {
   if (def.steady) return { holdA: 0.2, toB: 1.3, holdB: 0.2, toA: 1.3 };
+  // Tempo de técnica: excéntrica controlada (~2 s), concéntrica decidida (~1,2 s) y pausas breves.
   const ecc = 2.0;
-  const con = 1.1;
+  const con = 1.2;
   return {
-    holdA: 0.35,
+    holdA: 0.45,
     toB: def.bIsEccentric ? ecc : con,
-    holdB: 0.45,
+    holdB: 0.4,
     toA: def.bIsEccentric ? con : ecc,
   };
 }
 
-function phaseAt(
-  time: number,
-  tm: Timing
-): { t: number; phase: 'holdA' | 'toB' | 'holdB' | 'toA' } {
+type Phase = 'holdA' | 'toB' | 'holdB' | 'toA';
+
+function phaseAt(time: number, tm: Timing): { t: number; phase: Phase } {
   const total = tm.holdA + tm.toB + tm.holdB + tm.toA;
   let x = time % total;
   if (x < tm.holdA) return { t: 0, phase: 'holdA' };
@@ -81,26 +96,29 @@ export function Exercise3DViewer({
   const def = PATTERNS[exercise.pattern];
   const timing = useMemo(() => timingFor(def), [def]);
   const total = timing.holdA + timing.toB + timing.holdB + timing.toA;
+  const initialPreset: CameraPreset = def.view === 'front' ? 'frontal' : '3/4';
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const failRef = useRef(onWebGLFailed);
+  failRef.current = onWebGLFailed;
+  const progressRef = useRef<HTMLDivElement>(null);
   const [playing, setPlaying] = useState(animate);
   const [speed, setSpeed] = useState(1);
-  const [preset, setPreset] = useState<CameraPreset>(def.view === 'front' ? 'frontal' : '3/4');
-  const [uiState, setUiState] = useState<{ phase: string; progress: number }>({
-    phase: 'holdA',
-    progress: 0,
-  });
+  const [preset, setPreset] = useState<CameraPreset>(initialPreset);
+  const [phase, setPhase] = useState<Phase>('holdA');
+  const [ready, setReady] = useState(false);
 
-  // Refs mutables para el bucle 60fps sin re-crear el WebGLRenderer
+  // Refs mutables para el bucle de animación sin re-crear el WebGLRenderer
   const playingRef = useRef(playing);
   const speedRef = useRef(speed);
-  const visibleRef = useRef(true);
   const clockRef = useRef(0);
+  const wakeRef = useRef<() => void>(() => {});
+  const initialAngles = (initialPreset === '3/4' && PATTERN_34[exercise.pattern]) || PRESET_ANGLES[initialPreset];
   const camRef = useRef({
-    yaw: PRESET_ANGLES[def.view === 'front' ? 'frontal' : '3/4'].yaw,
-    pitch: PRESET_ANGLES[def.view === 'front' ? 'frontal' : '3/4'].pitch,
-    targetYaw: PRESET_ANGLES[def.view === 'front' ? 'frontal' : '3/4'].yaw,
-    targetPitch: PRESET_ANGLES[def.view === 'front' ? 'frontal' : '3/4'].pitch,
+    yaw: initialAngles.yaw,
+    pitch: initialAngles.pitch,
+    targetYaw: initialAngles.yaw,
+    targetPitch: initialAngles.pitch,
     dragging: false,
     lastX: 0,
     lastY: 0,
@@ -108,6 +126,7 @@ export function Exercise3DViewer({
 
   useEffect(() => {
     playingRef.current = playing;
+    wakeRef.current();
   }, [playing]);
 
   useEffect(() => {
@@ -119,10 +138,13 @@ export function Exercise3DViewer({
     if (m.matches) setPlaying(false);
   }, []);
 
+  const anglesFor = (p: CameraPreset) => (p === '3/4' && PATTERN_34[exercise.pattern]) || PRESET_ANGLES[p];
+
   const selectPreset = (p: CameraPreset) => {
     setPreset(p);
-    camRef.current.targetYaw = PRESET_ANGLES[p].yaw;
-    camRef.current.targetPitch = PRESET_ANGLES[p].pitch;
+    camRef.current.targetYaw = anglesFor(p).yaw;
+    camRef.current.targetPitch = anglesFor(p).pitch;
+    wakeRef.current();
   };
 
   useEffect(() => {
@@ -131,75 +153,58 @@ export function Exercise3DViewer({
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     } catch {
-      onWebGLFailed?.();
+      failRef.current?.();
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const isMobile = window.matchMedia('(max-width: 768px), (pointer: coarse)').matches;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
+    renderer.setClearColor(0x000000, 0); // el fondo de estudio lo pinta el CSS (claro/oscuro)
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.12;
     renderer.domElement.style.display = 'block';
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     host.appendChild(renderer.domElement);
 
-    // Escena estilo estudio ZBrush oscuro con iluminación dramática de 3 puntos
+    // Estudio fotográfico claro: fondo infinito (CSS), luz principal grande arriba-delante,
+    // relleno suave y contraluz discreto. El suelo sólo recibe la sombra de contacto.
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x131519);
-    scene.fog = new THREE.Fog(0x131519, 4.5, 9.5);
+    const camera = new THREE.PerspectiveCamera(FOV, 1, 0.05, 40);
 
-    const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 30);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xd9dad9, 1.05));
 
-    // Luz ambiental hemisférica suave
-    const hemi = new THREE.HemisphereLight(0xf1f4fa, 0x1e222a, 0.72);
-    scene.add(hemi);
-
-    // Luz clave principal (Key Light — esculpe los músculos como en las referencias ZBrush)
-    const keyLight = new THREE.DirectionalLight(0xfff6eb, 2.05);
-    keyLight.position.set(2.4, 3.6, 2.8);
+    const keyLight = new THREE.DirectionalLight(0xfff7ee, 2.1);
+    keyLight.position.set(1.6, 4.2, 2.6);
     keyLight.castShadow = true;
-    keyLight.shadow.mapSize.set(1024, 1024);
-    keyLight.shadow.camera.near = 0.5;
-    keyLight.shadow.camera.far = 10;
-    keyLight.shadow.camera.left = -2.2;
-    keyLight.shadow.camera.right = 2.2;
-    keyLight.shadow.camera.top = 2.6;
-    keyLight.shadow.camera.bottom = -1.2;
-    keyLight.shadow.bias = -0.0005;
-    scene.add(keyLight);
+    keyLight.shadow.mapSize.set(isMobile ? 1024 : 2048, isMobile ? 1024 : 2048);
+    keyLight.shadow.radius = 5;
+    keyLight.shadow.bias = -0.0004;
+    keyLight.shadow.normalBias = 0.02;
+    scene.add(keyLight, keyLight.target);
 
-    // Luz de relleno fría (Fill Light)
-    const fillLight = new THREE.DirectionalLight(0xa9c0e6, 0.65);
-    fillLight.position.set(-2.8, 1.8, 1.4);
+    const fillLight = new THREE.DirectionalLight(0xeef2ff, 0.55);
+    fillLight.position.set(-2.6, 1.6, 1.8);
     scene.add(fillLight);
 
-    // Contraluz marcada (Rim Light — silueta nítida estilo estudio)
-    const rimLight = new THREE.DirectionalLight(0xffffff, 1.15);
-    rimLight.position.set(-0.6, 2.4, -2.8);
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.7);
+    rimLight.position.set(-0.8, 2.6, -2.8);
     scene.add(rimLight);
 
-    // Suelo de estudio oscuro mate + cuadrícula sutil
-    const floorGeo = new THREE.CircleGeometry(4.2, 48);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x181b21,
-      roughness: 0.88,
-      metalness: 0.08,
-    });
+    const floorGeo = new THREE.PlaneGeometry(14, 14);
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.2 });
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     scene.add(floor);
 
-    const grid = new THREE.GridHelper(4.8, 16, 0x2b303a, 0x20242c);
-    grid.position.y = 0.002;
-    scene.add(grid);
-
-    // Maniquí 3D: arranca al instante con la malla paramétrica ZBrush y en cuanto carga
-    // el modelo Blender real (`/models/hombre.glb` o `/models/mujer.glb`) lo sustituye con su esqueleto mixamorig.
+    // Maniquí 3D: arranca al instante con la malla paramétrica y en cuanto carga
+    // el modelo Blender real (`/models/hombre.glb` o `/models/mujer.glb`) lo sustituye.
     const mannequin = createMannequin3D(sex);
     mannequin.setActiveMuscles(exercise.primary, exercise.secondary);
     scene.add(mannequin.root);
@@ -207,38 +212,53 @@ export function Exercise3DViewer({
     let glbCharacter: DrivenGLBCharacter | null = null;
     let disposed = false;
 
-    preloadGLBCharacter(sex)
-      .then((template) => {
-        if (disposed) return;
-        glbCharacter = createDrivenGLBCharacter(template, sex);
-        scene.add(glbCharacter.root);
-        mannequin.root.visible = false;
-      })
-      .catch(() => {
-        // Si no se puede cargar el GLB, se mantiene la escultura paramétrica 3D.
-      });
-
     const equipment = createEquipment3D(exercise, def);
     scene.add(equipment.root);
 
-    // Calcular centro y distancia óptima de cámara según el volumen del ejercicio
-    const sampleCenter = new THREE.Vector3();
-    let minY = Infinity;
-    let maxY = -Infinity;
-    for (const st of [0, 0.5, 1]) {
+    // Encuadre: caja que contiene cuerpo + máquina a lo largo de TODO el recorrido.
+    const bounds = new THREE.Box3();
+    const tmp = new THREE.Box3();
+    for (const st of [0, 0.25, 0.5, 0.75, 1]) {
       const { pose } = buildPose3D(exercise, st, sex);
-      const pts = [pose.pelvis, pose.head, pose.wristL, pose.wristR, pose.ankleL, pose.ankleR];
-      for (const p of pts) {
-        minY = Math.min(minY, p.y);
-        maxY = Math.max(maxY, p.y);
+      equipment.update(pose);
+      equipment.root.updateMatrixWorld(true);
+      tmp.setFromObject(equipment.root);
+      if (!tmp.isEmpty()) bounds.union(tmp);
+      for (const p of [pose.pelvis, pose.chest, pose.wristL, pose.wristR, pose.ankleL, pose.ankleR, pose.toeL, pose.toeR, pose.kneeL, pose.kneeR, pose.elbowL, pose.elbowR]) {
+        bounds.expandByPoint(tmp.min.copy(p).subScalar(0.08));
+        bounds.expandByPoint(tmp.max.copy(p).addScalar(0.08));
       }
-      sampleCenter.add(pose.pelvis).add(pose.chest);
+      // Cabeza (radio ~12 cm)
+      bounds.expandByPoint(tmp.min.copy(pose.head).subScalar(0.13));
+      bounds.expandByPoint(tmp.max.copy(pose.head).addScalar(0.13));
     }
-    sampleCenter.divideScalar(6);
-    sampleCenter.x = 0;
-    sampleCenter.y = Math.max(0.42, (minY + maxY) / 2);
-    const spanY = Math.max(1.15, maxY - minY + 0.35);
-    const radius = Math.min(3.45, Math.max(2.35, spanY * 1.48));
+    bounds.min.y = Math.min(bounds.min.y, 0);
+    const center = bounds.getCenter(new THREE.Vector3());
+    const size = bounds.getSize(new THREE.Vector3());
+
+    // Sombra ajustada a la escena
+    const reach = Math.max(size.x, size.y, size.z) * 0.75 + 0.3;
+    const sc = keyLight.shadow.camera as THREE.OrthographicCamera;
+    sc.left = -reach;
+    sc.right = reach;
+    sc.top = reach;
+    sc.bottom = -reach;
+    sc.near = 0.1;
+    sc.far = 14;
+    sc.updateProjectionMatrix();
+    keyLight.target.position.copy(center);
+    keyLight.position.copy(center).add(new THREE.Vector3(1.6, 4.2, 2.6));
+
+    let radius = 3;
+    const fitCamera = () => {
+      // Distancia para que quepa la escena desde cualquier ángulo de giro (horizontal = diagonal XZ).
+      const tanV = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+      const halfH = (size.y / 2) * 1.1;
+      const halfW = (Math.hypot(size.x, size.z) / 2) * 0.92;
+      const depth = Math.hypot(size.x, size.z) / 2;
+      radius = Math.max(halfH / tanV, halfW / (tanV * camera.aspect)) + depth * 0.35;
+      radius = THREE.MathUtils.clamp(radius, 1.8, 9);
+    };
 
     const resize = () => {
       const w = host.clientWidth || 320;
@@ -246,7 +266,75 @@ export function Exercise3DViewer({
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
+      fitCamera();
+      wake();
     };
+
+    // ---------- Bucle: sólo dibuja cuando hay movimiento ----------
+    let raf = 0;
+    let last = performance.now();
+    let visible = true;
+    let needsRender = true;
+    let lastPhase: Phase | null = null;
+
+    const wake = () => {
+      needsRender = true;
+      if (!raf && visible && !disposed) {
+        last = performance.now();
+        raf = requestAnimationFrame(renderLoop);
+      }
+    };
+    wakeRef.current = wake;
+
+    const drawPose = (t: number, pulse: number) => {
+      const { pose } = buildPose3D(exercise, t, sex);
+      if (glbCharacter) glbCharacter.applyPose(pose);
+      else mannequin.update(pose, pulse);
+      equipment.update(pose);
+    };
+
+    function renderLoop(now: number) {
+      raf = 0;
+      if (!visible || disposed) return;
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+
+      const animating = animate && playingRef.current;
+      if (animating) clockRef.current += dt * speedRef.current;
+
+      const { t, phase: ph } = phaseAt(clockRef.current, timing);
+      if (animating || needsRender) {
+        const isEcc = (ph === 'toB' && def.bIsEccentric) || (ph === 'toA' && !def.bIsEccentric);
+        const isCon = !def.steady && !isEcc && (ph === 'toA' || ph === 'toB');
+        drawPose(animate ? t : 0.75, isCon ? Math.sin(t * Math.PI) : 0);
+      }
+
+      // Suavizado exponencial de la órbita, independiente de los fps
+      const c = camRef.current;
+      const k = 1 - Math.exp(-dt * 10);
+      c.yaw += (c.targetYaw - c.yaw) * k;
+      c.pitch += (c.targetPitch - c.pitch) * k;
+      const orbiting = Math.abs(c.targetYaw - c.yaw) > 1e-4 || Math.abs(c.targetPitch - c.pitch) > 1e-4;
+
+      camera.position.set(
+        center.x + radius * Math.cos(c.pitch) * Math.sin(c.yaw),
+        center.y + radius * Math.sin(c.pitch),
+        center.z + radius * Math.cos(c.pitch) * Math.cos(c.yaw)
+      );
+      camera.lookAt(center);
+      renderer.render(scene, camera);
+      needsRender = false;
+
+      // Progreso por DOM directo (sin re-render de React); la fase sólo cuando cambia.
+      if (progressRef.current) progressRef.current.style.transform = `scaleX(${(clockRef.current % total) / total})`;
+      if (ph !== lastPhase) {
+        lastPhase = ph;
+        setPhase(ph);
+      }
+
+      if (animating || orbiting || c.dragging) raf = requestAnimationFrame(renderLoop);
+    }
+
     resize();
     const ro = new ResizeObserver(resize);
     ro.observe(host);
@@ -254,71 +342,33 @@ export function Exercise3DViewer({
     const io =
       typeof IntersectionObserver !== 'undefined'
         ? new IntersectionObserver(([entry]) => {
-            visibleRef.current = entry.isIntersecting;
+            visible = entry.isIntersecting;
+            if (visible) wake();
           })
         : null;
     io?.observe(host);
 
     // Pose inicial inmediata
-    const init = buildPose3D(exercise, animate ? 0 : 0.75, sex);
-    mannequin.update(init.pose, 0);
-    equipment.update(init.pose);
+    drawPose(animate ? 0 : 0.75, 0);
+    wake();
+    setReady(true);
 
-    let raf = 0;
-    let last = performance.now();
-    let uiTimer = 0;
-
-    const renderLoop = (now: number) => {
-      raf = requestAnimationFrame(renderLoop);
-      if (!visibleRef.current) {
-        last = now;
-        return;
-      }
-      const dt = Math.min(0.05, (now - last) / 1000);
-      last = now;
-
-      if (animate && playingRef.current) {
-        clockRef.current += dt * speedRef.current;
-      }
-
-      const { t, phase } = phaseAt(clockRef.current, timing);
-      const isEcc = (phase === 'toB' && def.bIsEccentric) || (phase === 'toA' && !def.bIsEccentric);
-      const isCon = !def.steady && !isEcc && (phase === 'toA' || phase === 'toB');
-      const pulse = isCon ? Math.sin(t * Math.PI) : 0;
-
-      const { pose } = buildPose3D(exercise, animate ? t : 0.75, sex);
-      if (glbCharacter) {
-        glbCharacter.applyPose(pose);
-      } else {
-        mannequin.update(pose, pulse);
-      }
-      equipment.update(pose);
-
-      // Suavizado de cámara orbital
-      const c = camRef.current;
-      c.yaw += (c.targetYaw - c.yaw) * 0.14;
-      c.pitch += (c.targetPitch - c.pitch) * 0.14;
-
-      camera.position.set(
-        sampleCenter.x + radius * Math.cos(c.pitch) * Math.sin(c.yaw),
-        sampleCenter.y + radius * Math.sin(c.pitch),
-        sampleCenter.z + radius * Math.cos(c.pitch) * Math.cos(c.yaw)
-      );
-      camera.lookAt(sampleCenter);
-      renderer.render(scene, camera);
-
-      uiTimer += dt;
-      if (uiTimer > 0.08) {
-        uiTimer = 0;
-        setUiState({ phase, progress: (clockRef.current % total) / total });
-      }
-    };
-
-    raf = requestAnimationFrame(renderLoop);
+    preloadGLBCharacter(sex)
+      .then((template) => {
+        if (disposed) return;
+        glbCharacter = createDrivenGLBCharacter(template, sex);
+        scene.add(glbCharacter.root);
+        mannequin.root.visible = false;
+        wake();
+      })
+      .catch(() => {
+        // Si no se puede cargar el GLB, se mantiene la escultura paramétrica 3D.
+      });
 
     return () => {
       disposed = true;
-      cancelAnimationFrame(raf);
+      wakeRef.current = () => {};
+      if (raf) cancelAnimationFrame(raf);
       ro.disconnect();
       io?.disconnect();
       glbCharacter?.dispose();
@@ -331,13 +381,14 @@ export function Exercise3DViewer({
         host.removeChild(renderer.domElement);
       }
     };
-  }, [exercise, sex, def, timing, total, animate, onWebGLFailed]);
+  }, [exercise, sex, def, timing, total, animate]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     camRef.current.dragging = true;
     camRef.current.lastX = e.clientX;
     camRef.current.lastY = e.clientY;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    wakeRef.current();
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -347,61 +398,60 @@ export function Exercise3DViewer({
     camRef.current.lastX = e.clientX;
     camRef.current.lastY = e.clientY;
     camRef.current.targetYaw -= dx * 0.011;
-    camRef.current.targetPitch = Math.max(
-      -0.12,
-      Math.min(0.85, camRef.current.targetPitch + dy * 0.008)
-    );
+    camRef.current.targetPitch = Math.max(-0.05, Math.min(0.85, camRef.current.targetPitch + dy * 0.008));
+    wakeRef.current();
   };
 
   const onPointerUp = () => {
     camRef.current.dragging = false;
+    wakeRef.current();
   };
 
-  const phaseLabel =
-    uiState.phase === 'toB' || uiState.phase === 'holdA' ? def.toB : def.toA;
-  const isEccentricPhase =
-    (uiState.phase === 'toB' && def.bIsEccentric) || (uiState.phase === 'toA' && !def.bIsEccentric);
+  const phaseLabel = phase === 'toB' || phase === 'holdA' ? def.toB : def.toA;
+  const isEccentricPhase = (phase === 'toB' && def.bIsEccentric) || (phase === 'toA' && !def.bIsEccentric);
 
   return (
     <div className={cn('space-y-3', className)}>
-      <div className="relative rounded-[8px] overflow-hidden bg-[#131519] aspect-[4/3] w-full touch-none select-none">
+      <div
+        className="relative rounded-[8px] overflow-hidden aspect-[4/3] w-full touch-none select-none border border-[var(--border)]"
+        style={{ background: 'var(--stage-bg)' }}
+      >
         <div
           ref={containerRef}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerCancel={onPointerUp}
-          className="h-full w-full cursor-grab active:cursor-grabbing"
+          className={cn('h-full w-full cursor-grab active:cursor-grabbing transition-opacity duration-300', ready ? 'opacity-100' : 'opacity-0')}
           role="img"
           aria-label={`Modelo 3D animado de ${exercise.name}. Arrastra para rotar 360 grados.`}
         />
 
-        {/* Insignia sutil de giro 360° */}
-        <div className="pointer-events-none absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-black/55 backdrop-blur-md px-2.5 py-1 text-[10px] font-medium text-white/80">
-          <RotateCw className="h-3 w-3 text-[#ff6105]" /> 3D · Arrastra para girar
+        <div className="pointer-events-none absolute top-2.5 left-2.5 inline-flex items-center gap-1 rounded-full bg-[var(--surface)]/80 backdrop-blur-md px-2.5 py-1 text-[10px] font-medium text-[var(--text-secondary)] border border-[var(--border)]">
+          <RotateCw className="h-3 w-3 text-[var(--accent)]" /> 3D · Arrastra para girar
         </div>
+      </div>
 
-        {/* Selector rápido de ángulo de cámara */}
-        {showControls && (
-          <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 inline-flex items-center gap-1 rounded-full bg-black/65 backdrop-blur-md p-1 border border-white/10">
+      {showControls && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-0.5 rounded-full border border-[var(--border)] bg-[var(--surface)] p-0.5" role="group" aria-label="Ángulo de cámara">
             {(['3/4', 'lateral', 'frontal', 'espalda'] as CameraPreset[]).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => selectPreset(p)}
+                aria-pressed={preset === p}
                 className={cn(
-                  'px-2.5 py-1 rounded-full text-[11px] font-medium capitalize transition-colors cursor-pointer',
-                  preset === p
-                    ? 'bg-[#ff6105] text-white'
-                    : 'text-white/75 hover:text-white'
+                  'px-3 py-1.5 rounded-full text-[11px] font-medium capitalize transition-colors cursor-pointer',
+                  preset === p ? 'bg-[var(--text)] text-[var(--bg)]' : 'text-[var(--text-muted)] hover:text-[var(--text)]'
                 )}
               >
                 {p}
               </button>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Controles de reproducción y fase */}
       {showControls && animate && (
@@ -422,10 +472,7 @@ export function Exercise3DViewer({
               )}
             </p>
             <div className="mt-1.5 h-[2px] rounded-full bg-[var(--border)] overflow-hidden">
-              <div
-                className="h-full bg-[var(--accent)]"
-                style={{ width: `${Math.round(uiState.progress * 100)}%` }}
-              />
+              <div ref={progressRef} className="h-full w-full origin-left bg-[var(--accent)]" style={{ transform: 'scaleX(0)' }} />
             </div>
           </div>
           <button

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, Dumbbell, Flame, Play, Users } from 'lucide-react';
+import { ArrowRight, Dumbbell, Flame, Heart, Play, Users } from 'lucide-react';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { useTraining } from '@/components/providers/TrainingProvider';
 import { AppShell } from '@/components/layout/AppShell';
@@ -22,7 +22,7 @@ const WEEK_LABELS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 export default function HoyPage() {
   const router = useRouter();
   const { user, profile, group, loading } = useAuth();
-  const { routine, workouts, nextDay, active, startWorkout, loading: tLoading } = useTraining();
+  const { routine, workouts, nextDay, active, startWorkout, favorites, loading: tLoading } = useTraining();
 
   useEffect(() => {
     if (loading) return;
@@ -153,6 +153,50 @@ export default function HoyPage() {
                 <Button>Crear mi rutina</Button>
               </Link>
             )}
+          </Card>
+        )}
+
+        {/* Favoritas: entrenar un día guardado con un toque */}
+        {favorites.length > 0 && (
+          <Card className="p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Heart className="h-4 w-4" strokeWidth={1.6} fill="var(--accent)" color="var(--accent)" />
+                <h3 className="eyebrow">Tus favoritas</h3>
+              </div>
+              <Link href="/rutina" className="text-xs text-[var(--text-secondary)] underline underline-offset-4">
+                Ver todas
+              </Link>
+            </div>
+            <ul className="divide-y divide-[var(--border)]">
+              {favorites
+                .flatMap((f) => f.days.map((d) => ({ f, d })))
+                .slice(0, 4)
+                .map(({ f, d }) => (
+                  <li key={`${f.id}-${d.id}`} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{f.kind === 'day' ? f.name : d.name}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate">
+                        {f.kind === 'plan' ? `${f.name} · ` : ''}
+                        {d.exercises.length} ejercicios
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!routine}
+                      onClick={() => {
+                        if (!routine) return;
+                        if (active && !window.confirm('Tienes un entrenamiento en curso. ¿Quieres reemplazarlo?')) return;
+                        startWorkout(createWorkoutFromDay(routine, { ...d, name: f.kind === 'day' ? f.name : d.name }, workouts));
+                        router.push('/entrenar');
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-[24px] border border-[var(--border)] px-3.5 py-2 text-xs font-medium hover:bg-[var(--surface-elevated)] touch-target shrink-0 cursor-pointer disabled:opacity-40"
+                    >
+                      <Play className="h-3.5 w-3.5" /> Entrenar
+                    </button>
+                  </li>
+                ))}
+            </ul>
           </Card>
         )}
 

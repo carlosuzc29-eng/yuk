@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  Heart,
   ArrowDown,
   ArrowUp,
   Info,
@@ -33,6 +34,16 @@ import {
 } from '@/lib/training/generator';
 import { createWorkoutFromDay } from '@/lib/training/session';
 import { DayFocusPicker } from '@/components/onboarding/DayFocusPicker';
+import { FavoriteToggle, FavoritesList, SaveFavoriteForm } from '@/components/routine/Favorites';
+import {
+  MAX_FAVORITES,
+  applyFavoriteDay,
+  applyFavoritePlan,
+  defaultPlanName,
+  favoriteFromDay,
+  favoriteFromPlan,
+  findFavoriteFor,
+} from '@/lib/training/favorites';
 import { saveUserProfile } from '@/lib/firebase/auth-service';
 import type { Exercise, ModalityPreference, Routine, RoutineDay, RoutineExercise } from '@/types/training';
 import {
@@ -51,14 +62,35 @@ type SheetState =
   | { kind: 'add' }
   | { kind: 'edit'; uid: string }
   | { kind: 'customize' }
-  | { kind: 'regenerate' };
+  | { kind: 'regenerate' }
+  | { kind: 'favorites' }
+  | { kind: 'saveFavorite'; target: 'plan' | 'day' };
 
 const MUSCLE_ORDER = Object.keys(MUSCLE_LABELS) as MuscleId[];
 
 export default function RutinaPage() {
   const router = useRouter();
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
-  const { routine, loading, saveRoutine, regenerate, routineOutdated, startWorkout, active, workouts } = useTraining();
+  const {
+    routine,
+    loading,
+    saveRoutine,
+    regenerate,
+    routineOutdated,
+    startWorkout,
+    active,
+    workouts,
+    favorites,
+    addFavorite,
+    removeFavorite,
+    renameFavorite,
+  } = useTraining();
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2600);
+    return () => window.clearTimeout(id);
+  }, [toast]);
   const [dayIdx, setDayIdx] = useState(0);
   const [sheet, setSheet] = useState<SheetState>({ kind: 'none' });
 
@@ -77,6 +109,23 @@ export default function RutinaPage() {
   const day = routine?.days[dayIdx];
 
   const close = () => setSheet({ kind: 'none' });
+
+  // ───── Favoritas ─────
+  const planFav = routine ? findFavoriteFor(favorites, { kind: 'plan', days: routine.days }) : undefined;
+  const dayFav = day ? findFavoriteFor(favorites, { kind: 'day', day }) : undefined;
+
+  const togglePlanFavorite = async () => {
+    if (planFav) {
+      await removeFavorite(planFav.id);
+      setToast('Plan quitado de favoritas');
+    } else setSheet({ kind: 'saveFavorite', target: 'plan' });
+  };
+  const toggleDayFavorite = async () => {
+    if (dayFav) {
+      await removeFavorite(dayFav.id);
+      setToast('Día quitado de favoritas');
+    } else setSheet({ kind: 'saveFavorite', target: 'day' });
+  };
 
   const commit = async (next: Routine) => {
     await saveRoutine(next);
@@ -152,6 +201,16 @@ export default function RutinaPage() {
       title="Rutina"
       subtitle={routine ? `${SPLIT_LABELS[routine.split]} · ${routine.days.length} días/semana` : 'Tu plan semanal'}
       rightSlot={
+        <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setSheet({ kind: 'favorites' })}
+          className="inline-flex items-center gap-1.5 rounded-[24px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--surface-elevated)] touch-target shrink-0 cursor-pointer"
+          aria-label={`Rutinas favoritas (${favorites.length})`}
+        >
+          <Heart className="h-4 w-4" strokeWidth={1.6} fill={favorites.length ? 'var(--accent)' : 'none'} color={favorites.length ? 'var(--accent)' : 'currentColor'} />
+          <span className="tabular-nums">{favorites.length}</span>
+        </button>
         <button
           type="button"
           onClick={() => setSheet({ kind: 'regenerate' })}
@@ -159,6 +218,7 @@ export default function RutinaPage() {
         >
           <RefreshCw className="h-4 w-4" strokeWidth={1.6} /> Regenerar
         </button>
+        </div>
       }
     >
       {loading || !routine ? (
@@ -183,6 +243,13 @@ export default function RutinaPage() {
               </Button>
             </div>
           )}
+          {/* Plan completo: guardar en favoritas */}
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs text-[var(--text-muted)]">
+              {planFav ? `Guardado como «${planFav.name}»` : 'Guarda este plan para volver a usarlo cuando quieras.'}
+            </p>
+            <FavoriteToggle saved={!!planFav} onClick={togglePlanFavorite} label="Plan completo" />
+          </div>
           {/* Selector de días */}
           <div role="tablist" aria-label="Días de la rutina" className="flex gap-2 overflow-x-auto -mx-5 px-5 pb-1">
             {routine.days.map((d, i) => (
@@ -232,6 +299,7 @@ export default function RutinaPage() {
                     </p>
                   )}
                 </div>
+                <FavoriteToggle saved={!!dayFav} onClick={toggleDayFavorite} label={`Día «${day.name}»`} compact />
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -353,6 +421,89 @@ export default function RutinaPage() {
           />
         )}
       </Sheet>
+
+      <Sheet open={sheet.kind === 'favorites'} onClose={close} title="Rutinas favoritas">
+        {sheet.kind === 'favorites' && (
+          <FavoritesList
+            favorites={favorites}
+            routine={routine}
+            currentDay={day}
+            onUsePlan={async (fav) => {
+              if (!routine) return;
+              if (!window.confirm(`¿Usar «${fav.name}» como tu plan actual? Tu plan de ahora se reemplaza (guárdalo antes en favoritas si quieres conservarlo).`)) return;
+              await saveRoutine(applyFavoritePlan(routine, fav));
+              setDayIdx(0);
+              close();
+              setToast(`Ahora usas «${fav.name}»`);
+            }}
+            onTrainDay={(fav, d) => {
+              if (!routine) return;
+              if (active && !window.confirm('Tienes un entrenamiento en curso. ¿Quieres reemplazarlo?')) return;
+              startWorkout(createWorkoutFromDay(routine, { ...d, name: fav.name }, workouts));
+              router.push('/entrenar');
+            }}
+            onAddDay={async (fav) => {
+              if (!routine) return;
+              const r = applyFavoriteDay(routine, fav, { add: true });
+              await saveRoutine(r.routine);
+              setDayIdx(r.dayIdx);
+              close();
+              setToast(`«${fav.name}» añadido como día ${r.dayIdx + 1}`);
+            }}
+            onReplaceDay={async (fav) => {
+              if (!routine || !day) return;
+              if (!window.confirm(`¿Reemplazar «${day.name}» por «${fav.name}»?`)) return;
+              const r = applyFavoriteDay(routine, fav, { replaceIdx: dayIdx });
+              await saveRoutine(r.routine);
+              close();
+              setToast(`«${day.name}» reemplazado`);
+            }}
+            onRename={(fav, n) => void renameFavorite(fav.id, n)}
+            onDelete={async (fav) => {
+              await removeFavorite(fav.id);
+              setToast('Favorita borrada');
+            }}
+          />
+        )}
+      </Sheet>
+
+      <Sheet
+        open={sheet.kind === 'saveFavorite'}
+        onClose={close}
+        title={sheet.kind === 'saveFavorite' && sheet.target === 'day' ? 'Guardar día en favoritas' : 'Guardar plan en favoritas'}
+      >
+        {sheet.kind === 'saveFavorite' && routine && (sheet.target === 'plan' || day) && (
+          <SaveFavoriteForm
+            kind={sheet.target}
+            full={favorites.length >= MAX_FAVORITES}
+            defaultName={sheet.target === 'plan' ? defaultPlanName(routine) : day!.name}
+            summary={
+              sheet.target === 'plan'
+                ? `${routine.days.length} días: ${routine.days.map((d) => d.name).join(', ')}`
+                : `${day!.exercises.length} ejercicios: ${day!.exercises
+                    .slice(0, 5)
+                    .map((e) => getExercise(e.exerciseId)?.name)
+                    .filter(Boolean)
+                    .join(', ')}${day!.exercises.length > 5 ? '…' : ''}`
+            }
+            onSave={async (name) => {
+              const fav = sheet.target === 'plan' ? favoriteFromPlan(routine, name) : favoriteFromDay(routine, day!, name);
+              await addFavorite(fav);
+              close();
+              setToast(`«${fav.name}» guardado en favoritas`);
+            }}
+          />
+        )}
+      </Sheet>
+
+      {toast && (
+        <div
+          role="status"
+          className="fixed left-1/2 -translate-x-1/2 bottom-[calc(84px+env(safe-area-inset-bottom))] z-50 rounded-[24px] bg-[var(--text)] text-[var(--bg)] px-4 py-2.5 text-sm shadow-lg max-w-[calc(100vw-32px)] text-center"
+        >
+          {toast}
+        </div>
+      )}
 
       <Sheet open={sheet.kind === 'regenerate'} onClose={close} title="Regenerar rutina">
         {sheet.kind === 'regenerate' && (

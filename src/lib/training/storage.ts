@@ -12,7 +12,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { getFirebaseServices } from '@/lib/firebase/client';
-import type { BodyWeightEntry, Routine, Workout } from '@/types/training';
+import type { BodyWeightEntry, FavoriteRoutine, Routine, Workout } from '@/types/training';
 
 /**
  * Persistencia de rutinas, entrenamientos y peso corporal.
@@ -25,6 +25,7 @@ const LOCAL = {
   workouts: (uid: string) => `yuk_workouts_v1_${uid}`,
   active: (uid: string) => `yuk_active_workout_v1_${uid}`,
   weight: (uid: string) => `yuk_bodyweight_v1_${uid}`,
+  favorites: (uid: string) => `yuk_favorites_v1_${uid}`,
   members: 'forja_local_group_members_v1',
 };
 
@@ -93,6 +94,57 @@ export async function saveRoutine(uid: string, routine: Routine): Promise<Routin
   }
   writeJSON(LOCAL.routine(uid), next);
   return next;
+}
+
+// ───────────── Rutinas favoritas ─────────────
+// En Firestore viven junto a la rutina activa: users/{uid}/routines/{fav_…} con `favorite: true`
+// (las reglas ya validan esos documentos como rutinas y son privados del usuario).
+
+export async function listFavorites(uid: string): Promise<FavoriteRoutine[]> {
+  const s = getFirebaseServices();
+  let list: FavoriteRoutine[];
+  if (s) {
+    const snap = await getDocs(collection(s.db, 'users', uid, 'routines'));
+    list = snap.docs
+      .filter((d) => d.id !== 'current' && d.data().favorite === true)
+      .map((d) => {
+        const { favorite: _f, isActive: _a, daysPerWeek: _d, ...rest } = d.data();
+        return fromFirestore<FavoriteRoutine>({ ...rest, id: d.id });
+      });
+  } else {
+    list = readJSON<FavoriteRoutine[]>(LOCAL.favorites(uid), []);
+  }
+  return list.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function saveFavorite(uid: string, fav: FavoriteRoutine): Promise<FavoriteRoutine> {
+  const next = { ...fav, updatedAt: new Date().toISOString() };
+  const s = getFirebaseServices();
+  if (s) {
+    await setDoc(doc(s.db, 'users', uid, 'routines', fav.id), {
+      ...toFirestore(next),
+      favorite: true,
+      isActive: false,
+      daysPerWeek: next.days.length,
+    });
+    return next;
+  }
+  const list = readJSON<FavoriteRoutine[]>(LOCAL.favorites(uid), []).filter((f) => f.id !== fav.id);
+  writeJSON(LOCAL.favorites(uid), [next, ...list]);
+  return next;
+}
+
+export async function deleteFavorite(uid: string, id: string): Promise<void> {
+  if (id === 'current') return; // nunca borrar la rutina activa por esta vía
+  const s = getFirebaseServices();
+  if (s) {
+    await deleteDoc(doc(s.db, 'users', uid, 'routines', id));
+    return;
+  }
+  writeJSON(
+    LOCAL.favorites(uid),
+    readJSON<FavoriteRoutine[]>(LOCAL.favorites(uid), []).filter((f) => f.id !== id)
+  );
 }
 
 // ───────────── Entrenamientos ─────────────

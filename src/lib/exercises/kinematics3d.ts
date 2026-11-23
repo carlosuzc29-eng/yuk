@@ -138,6 +138,12 @@ function lateralConfigFor(
   switch (pattern) {
     case 'bench_press':
     case 'incline_press':
+      // Pies abiertos y apoyados a los lados del banco (que mide ~0,34 m de ancho).
+      handHalfWidth = equipment === 'barra' ? 0.31 : 0.25;
+      elbowOutFlare = 0.22;
+      footHalfWidth = 0.3;
+      kneeOutFlare = 0.12;
+      break;
     case 'chest_press_machine':
     case 'push_up':
       handHalfWidth = equipment === 'barra' ? 0.31 : 0.25;
@@ -146,9 +152,20 @@ function lateralConfigFor(
       kneeOutFlare = 0.06;
       break;
     case 'fly_lying':
+      handHalfWidth = 0.32;
+      elbowOutFlare = 0.28;
+      footHalfWidth = 0.3;
+      kneeOutFlare = 0.12;
+      break;
     case 'fly_cable':
       handHalfWidth = 0.32;
       elbowOutFlare = 0.28;
+      break;
+    case 'skull_crusher':
+      handHalfWidth = 0.15; // agarre de barra EZ, algo más estrecho que los hombros
+      elbowOutFlare = 0.06;
+      footHalfWidth = 0.3;
+      kneeOutFlare = 0.12;
       break;
     case 'pulldown':
     case 'pull_up':

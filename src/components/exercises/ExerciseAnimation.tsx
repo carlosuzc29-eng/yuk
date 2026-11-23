@@ -1,11 +1,36 @@
 'use client';
 
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Pause, Play } from 'lucide-react';
 import type { Exercise } from '@/types/training';
 import type { MuscleId, Sex } from '@/types/user';
 import { useAuth } from '@/components/providers/AuthProvider';
-import { Exercise3DViewer } from './Exercise3DViewer';
+
+/**
+ * El visor 3D (three.js, ~230 KB) sólo se descarga cuando se muestra una demo interactiva
+ * (detalle de ejercicio, modo entrenamiento). Las miniaturas usan el SVG y no lo necesitan.
+ */
+const Exercise3DViewer = dynamic(() => import('./Exercise3DViewer').then((m) => m.Exercise3DViewer), {
+  ssr: false,
+  loading: () => <StagePlaceholder />,
+});
+
+function StagePlaceholder() {
+  return (
+    <div className="space-y-3" aria-busy="true" aria-label="Cargando demostración 3D">
+      <div
+        className="relative aspect-[4/3] w-full rounded-[8px] border border-[var(--border)] overflow-hidden"
+        style={{ background: 'var(--stage-bg)' }}
+      >
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="h-6 w-6 rounded-full border-2 border-[var(--border)] border-t-[var(--accent)] animate-spin" />
+        </div>
+      </div>
+      <div className="h-9" />
+    </div>
+  );
+}
 import { PATTERNS, type Pad, type PatternDef } from '@/lib/exercises/poses';
 import {
   add,
@@ -172,6 +197,8 @@ export function ExerciseAnimation({
   const { profile } = useAuth();
   const sex: Sex = sexProp ?? profile?.sex ?? 'male';
   const [webglFailed, setWebglFailed] = useState(false);
+  // Estable entre renders: si cambiara, el visor 3D reconstruiría toda la escena.
+  const onWebGLFailed = useCallback(() => setWebglFailed(true), []);
 
   // En vistas interactivas (detalle, modo entrenamiento) usamos el motor 3D realista con máquinas y cámara 360°.
   // En miniaturas (`fill` o `animate={false}`) usamos el SVG anatómico ultrarrápido para no saturar contextos WebGL.
@@ -184,7 +211,7 @@ export function ExerciseAnimation({
         animate={animate}
         showControls={showControls}
         className={className}
-        onWebGLFailed={() => setWebglFailed(true)}
+        onWebGLFailed={onWebGLFailed}
       />
     );
   }

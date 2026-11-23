@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { TrainingProvider } from '@/components/providers/TrainingProvider';
+import { Preloader } from '@/components/layout/Preloader';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -60,11 +61,18 @@ export default function RootLayout({
       <head>
         <meta name="color-scheme" content="light dark" />
         <script dangerouslySetInnerHTML={{ __html: FOUC_SCRIPT }} />
+        {/* Sin JavaScript el preloader nunca se retiraría: lo ocultamos. */}
+        <noscript>
+          <style>{`#yuk-preloader{display:none!important}`}</style>
+        </noscript>
       </head>
       <body className="antialiased selection:bg-[var(--accent)] selection:text-white">
         <ThemeProvider>
           <AuthProvider>
-            <TrainingProvider>{children}</TrainingProvider>
+            <TrainingProvider>
+              <Preloader />
+              {children}
+            </TrainingProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

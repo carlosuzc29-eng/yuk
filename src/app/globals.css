@@ -121,6 +121,23 @@
     --fig-band: light-dark(#7a7b7b, #a2a3a2);
   }
 
+  /* Estudio de las demostraciones 3D: fondo infinito claro (nunca negro).
+     Claro: gris perla. Oscuro: grafito medio para no deslumbrar. */
+  --stage-1: #ffffff;
+  --stage-2: #eff0ef;
+  --stage-3: #dcdedc;
+  @media (prefers-color-scheme: dark) {
+    --stage-1: #5a5c5b;
+    --stage-2: #444645;
+    --stage-3: #343635;
+  }
+  @supports (color: light-dark(white, black)) {
+    --stage-1: light-dark(#ffffff, #5a5c5b);
+    --stage-2: light-dark(#eff0ef, #444645);
+    --stage-3: light-dark(#dcdedc, #343635);
+  }
+  --stage-bg: radial-gradient(130% 95% at 50% 18%, var(--stage-1) 0%, var(--stage-2) 48%, var(--stage-3) 100%);
+
   /* Gráficos (validado: claro #ff6105, oscuro #f05a08 en banda L 0.48–0.67) */
   --chart-1: #ff6105;
   --chart-track: #ffdfcd;
@@ -274,6 +291,24 @@ body {
   border-color: color-mix(in srgb, var(--success) 35%, transparent);
   background: color-mix(in srgb, var(--success) 8%, transparent);
 }
+}
+
+/* ---------- Preloader ---------- */
+.yuk-preloader {
+  transition: opacity 400ms ease, visibility 400ms ease;
+}
+.yuk-preloader[data-leaving="true"] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.yuk-preloader-dot {
+  transform-origin: 60px 60px;
+  animation: yuk-breathe 1.6s ease-in-out infinite;
+}
+@keyframes yuk-breathe {
+  0%, 100% { transform: scale(0.82); opacity: 0.85; }
+  50% { transform: scale(1); opacity: 1; }
 }
 
 /* Foco accesible visible */
